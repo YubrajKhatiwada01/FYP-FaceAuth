@@ -1,0 +1,62 @@
+{% extends "base.html" %}
+
+{% block title %}FaceAuth | Login{% endblock %}
+{% block header %}{% endblock %}
+{% block footer %}{% endblock %}
+
+{% block content %}
+<section class="login-page">
+  <div class="login-orbit" aria-hidden="true"></div>
+
+  <div class="login-identity">
+    <div class="brand-mark large" aria-hidden="true">
+      <img src="{{ url_for('static', filename='images/final logo.png') }}" alt="FaceAuth Logo">
+    </div>
+    <h1>FaceAuth</h1>
+    <p>Facial Authentication System</p>
+  </div>
+
+  <form class="login-card" method="post" novalidate>
+    <input type="hidden" name="csrf_token" value="{{ csrf_token }}"/>
+    <div class="field-row">
+      <label for="operator_id">Operator ID</label>
+      <span>Secure_Channel_A</span>
+    </div>
+    <div class="input-shell">
+      <span aria-hidden="true">ID</span>
+      <input id="operator_id" name="operator_id" type="text" placeholder="UID-000-000" autocomplete="username" required>
+    </div>
+
+    <div class="field-row">
+      <label for="access_token">Access Token</label>
+      <span>Encrypted_RSA_4096</span>
+    </div>
+    <div class="input-shell">
+      <span aria-hidden="true">PK</span>
+      <input id="access_token" name="access_token" type="password" placeholder="••••••••••••" autocomplete="current-password" required>
+    </div>
+    {% if message %}
+      <p class="form-message {{ message.type }}">{{ message.text }}</p>
+    {% endif %}
+
+    <button type="submit" class="btn btn-primary" style="width: 100%; margin: 20px 0 0 0;">Initialize Access</button>
+
+    <div class="login-links">
+      <a href="#">Forgot Protocol?</a>
+      <a href="#">Register Node</a>
+    </div>
+  </form>
+
+  <div class="login-status" aria-label="System status">
+    <div>
+      <span class="pulse-dot"></span>
+      <strong>System Online</strong>
+      <small>Uptime: 99.98%</small>
+    </div>
+    <div>
+      <strong>Global Mesh</strong>
+      <small>Active Nodes: 1,482</small>
+    </div>
+  </div>
+</section>
+{% endblock %}

@@ -1,0 +1,19 @@
+{% extends "base.html" %}
+
+{% block title %}500 - Server Error | FaceAuth{% endblock %}
+
+{% block content %}
+<section class="hero" style="min-height: 80vh; display: flex; align-items: center; justify-content: center; flex-direction: column; text-align: center;">
+  <div class="hero-content">
+    <h1 style="font-size: 6rem; margin-bottom: 20px;">500</h1>
+    <h2>Server Error</h2>
+    <p class="hero-lede">
+      Something went wrong on our end. Our team has been notified and is working on a fix.
+    </p>
+    <div class="hero-actions">
+      <a class="btn btn-primary" href="{{ url_for('landing') }}">Return to Home</a>
+      <a class="btn btn-secondary" href="{{ url_for('login') }}">Try Again</a>
+    </div>
+  </div>
+</section>
+{% endblock %}

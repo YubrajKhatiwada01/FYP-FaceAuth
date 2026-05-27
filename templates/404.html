@@ -1,0 +1,19 @@
+{% extends "base.html" %}
+
+{% block title %}404 - Page Not Found | FaceAuth{% endblock %}
+
+{% block content %}
+<section class="hero" style="min-height: 80vh; display: flex; align-items: center; justify-content: center; flex-direction: column; text-align: center;">
+  <div class="hero-content">
+    <h1 style="font-size: 6rem; margin-bottom: 20px;">404</h1>
+    <h2>Page Not Found</h2>
+    <p class="hero-lede">
+      The resource you're looking for doesn't exist or has been moved.
+    </p>
+    <div class="hero-actions">
+      <a class="btn btn-primary" href="{{ url_for('landing') }}">Return to Home</a>
+      <a class="btn btn-secondary" href="{{ url_for('login') }}">Go to Login</a>
+    </div>
+  </div>
+</section>
+{% endblock %}

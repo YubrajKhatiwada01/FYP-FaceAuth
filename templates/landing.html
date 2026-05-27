@@ -1,0 +1,87 @@
+{% extends "base.html" %}
+
+{% block title %}FaceAuth | Secure Facial Recognition Authentication{% endblock %}
+
+{% block content %}
+<section class="hero">
+  <div class="hero-bg" aria-hidden="true"></div>
+  <div class="hero-grid" aria-hidden="true"></div>
+
+  <div class="hero-content">
+    <p class="eyebrow">AWS Lambda biometric access control</p>
+    <h1>FaceAuth</h1>
+    <p class="hero-lede">
+      A cloud-powered facial recognition authentication interface for secure facilities,
+      smart access points, and enterprise monitoring.
+    </p>
+
+    <div class="hero-actions">
+      <a class="btn btn-primary" href="{{ url_for('login') }}">Open Login</a>
+      <a class="btn btn-secondary" href="#capabilities">View System</a>
+    </div>
+
+    <div class="system-strip" aria-label="System status">
+      <div>
+        <span class="pulse-dot"></span>
+        <strong>System Online</strong>
+        <small>Uptime: 99.98%</small>
+      </div>
+      <div>
+        <strong>Global Mesh</strong>
+        <small>Active Nodes: 1,482</small>
+      </div>
+      <div>
+        <strong>Lambda Ready</strong>
+        <small>Avg latency: 24ms</small>
+      </div>
+    </div>
+  </div>
+</section>
+
+<section class="section" id="capabilities">
+  <div class="section-heading">
+    <p class="eyebrow">Operational modules</p>
+    <h2>Built for fast security decisions</h2>
+  </div>
+
+  <div class="feature-grid">
+    <article class="feature-card">
+      <span class="feature-icon">01</span>
+      <h3>Contactless Authentication</h3>
+      <p>Capture a live face scan, check liveness markers, and return access status from the cloud workflow.</p>
+    </article>
+    <article class="feature-card">
+      <span class="feature-icon">02</span>
+      <h3>Admin Command Center</h3>
+      <p>Track success rate, denied attempts, recent events, and camera activity through a compact dashboard.</p>
+    </article>
+    <article class="feature-card">
+      <span class="feature-icon">03</span>
+      <h3>Cloud Monitoring</h3>
+      <p>Surface Lambda, DynamoDB, S3, log-feed, and network health indicators for system administrators.</p>
+    </article>
+  </div>
+</section>
+
+<section class="section architecture" id="architecture">
+  <div class="architecture-copy">
+    <p class="eyebrow">Serverless architecture</p>
+    <h2>Designed around API Gateway, Lambda, S3, and DynamoDB</h2>
+    <p>
+      The frontend is prepared for a Python backend layer that can later send authentication
+      requests through API Gateway, trigger Lambda processing, compare facial records, and
+      store security events.
+    </p>
+  </div>
+
+  <div class="flow-panel" aria-label="FaceAuth architecture flow">
+    <div class="flow-node">Camera Node</div>
+    <div class="flow-line"></div>
+    <div class="flow-node">API Gateway</div>
+    <div class="flow-line"></div>
+    <div class="flow-node">AWS Lambda</div>
+    <div class="flow-line"></div>
+    <div class="flow-node">DynamoDB + S3</div>
+  </div>
+</section>
+{% endblock %}

@@ -1,0 +1,149 @@
+<!doctype html>
+<html lang="en">
+  <head>
+    <meta charset="utf-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1">
+    <title>{% block title %}FaceAuth{% endblock %}</title>
+    <link rel="icon" type="image/png" href="{{ url_for('static', filename='images/final logo.png') }}">
+    <link rel="stylesheet" href="{{ url_for('static', filename='css/style.css') }}">
+  </head>
+  <body{% if body_class %} class="{{ body_class }}"{% endif %}>
+    <div class="site-shell">
+      {% block header %}
+        <header class="nav-shell">
+          <a class="brand" href="{{ url_for('landing') }}" aria-label="FaceAuth home">
+            <span class="brand-mark" aria-hidden="true">
+              <img src="{{ url_for('static', filename='images/final logo.png') }}" alt="FaceAuth Logo">
+            </span>
+            <span>
+              <strong>FaceAuth</strong>
+            </span>
+          </a>
+
+          <button class="nav-toggle" type="button" aria-label="Open navigation" aria-expanded="false">
+            <span></span>
+            <span></span>
+            <span></span>
+          </button>
+
+          <nav class="nav-links" aria-label="Primary navigation">
+            <a class="{{ 'is-active' if active_page == 'home' else '' }}" href="{{ url_for('landing') }}">Overview</a>
+            <a href="{{ url_for('landing') }}#capabilities">Capabilities</a>
+            <a href="{{ url_for('landing') }}#architecture">Architecture</a>
+            <a class="{{ 'is-active' if active_page == 'login' else '' }}" href="{{ url_for('login') }}">Login</a>
+          </nav>
+
+          <a class="nav-cta" href="{{ url_for('login') }}">Initialize Access</a>
+        </header>
+      {% endblock %}
+
+      <main>
+        {% block content %}{% endblock %}
+      </main>
+
+      {% block footer %}
+      <footer class="site-footer">
+        <div class="footer-container">
+          <div class="footer-grid">
+            <!-- Brand Section -->
+            <div class="footer-section footer-brand">
+              <div class="footer-logo">
+                <div class="brand-mark" aria-hidden="true">
+                  <img src="{{ url_for('static', filename='images/final logo.png') }}" alt="FaceAuth Logo">
+                </div>
+                <div>
+                  <strong>FaceAuth</strong>
+                </div>
+              </div>
+              <p class="footer-description">
+                Enterprise-grade facial recognition authentication for secure facilities and intelligent access control.
+              </p>
+              <div class="social-links">
+                <a href="#" aria-label="Twitter" title="Twitter">
+                  <svg width="20" height="20" viewBox="0 0 24 24" fill="currentColor">
+                    <path d="M23 3a10.9 10.9 0 01-3.14 1.53 4.48 4.48 0 00-7.86 3v1A10.66 10.66 0 013 4s-4 9 5 13a11.64 11.64 0 01-7 2s9 5 20 5a9.5 9.5 0 00-9-5.5c4.75 2.25 7-7 7-7z"/>
+                  </svg>
+                </a>
+                <a href="#" aria-label="LinkedIn" title="LinkedIn">
+                  <svg width="20" height="20" viewBox="0 0 24 24" fill="currentColor">
+                    <path d="M16 8a6 6 0 016 6v7h-4v-7a2 2 0 00-2-2 2 2 0 00-2 2v7h-4v-7a6 6 0 016-6zM2 9h4v12H2z"/>
+                    <circle cx="4" cy="4" r="2"/>
+                  </svg>
+                </a>
+                <a href="#" aria-label="GitHub" title="GitHub">
+                  <svg width="20" height="20" viewBox="0 0 24 24" fill="currentColor">
+                    <path d="M12 2C6.477 2 2 6.477 2 12c0 4.42 2.865 8.17 6.839 9.49.5.092.682-.217.682-.482 0-.237-.008-.866-.013-1.7-2.782.603-3.369-1.34-3.369-1.34-.454-1.156-1.11-1.463-1.11-1.463-.908-.62.069-.608.069-.608 1.003.07 1.531 1.03 1.531 1.03.892 1.529 2.341 1.547 2.914 1.186.092-.923.35-1.548.636-1.904-2.22-.252-4.555-1.112-4.555-4.943 0-1.091.39-1.984 1.029-2.683-.103-.253-.446-1.268.098-2.647 0 0 .84-.269 2.75 1.025A9.578 9.578 0 0112 6.836c.85.004 1.705.114 2.504.336 1.909-1.294 2.747-1.025 2.747-1.025.546 1.379.203 2.394.1 2.647.64.699 1.028 1.592 1.028 2.683 0 3.842-2.339 4.687-4.566 4.935.359.309.678.919.678 1.852 0 1.336-.012 2.415-.012 2.743 0 .267.18.578.688.48C19.139 20.167 22 16.418 22 12c0-5.523-4.477-10-10-10z"/>
+                  </svg>
+                </a>
+              </div>
+            </div>
+
+            <!-- Product Links -->
+            <div class="footer-section">
+              <h4>Product</h4>
+              <ul>
+                <li><a href="{{ url_for('landing') }}#capabilities">Features</a></li>
+                <li><a href="{{ url_for('landing') }}#architecture">Architecture</a></li>
+                <li><a href="#">Pricing</a></li>
+                <li><a href="#">Security</a></li>
+                <li><a href="#">Compliance</a></li>
+              </ul>
+            </div>
+
+            <!-- Company Links -->
+            <div class="footer-section">
+              <h4>Company</h4>
+              <ul>
+                <li><a href="#">About Us</a></li>
+                <li><a href="#">Blog</a></li>
+                <li><a href="#">Careers</a></li>
+                <li><a href="#">Contact</a></li>
+                <li><a href="#">Press Kit</a></li>
+              </ul>
+            </div>
+
+            <!-- Resources Links -->
+            <div class="footer-section">
+              <h4>Resources</h4>
+              <ul>
+                <li><a href="#">Documentation</a></li>
+                <li><a href="#">API Reference</a></li>
+                <li><a href="#">Community</a></li>
+                <li><a href="#">Support</a></li>
+                <li><a href="#">Status Page</a></li>
+              </ul>
+            </div>
+
+            <!-- Legal Links -->
+            <div class="footer-section">
+              <h4>Legal</h4>
+              <ul>
+                <li><a href="#">Privacy Policy</a></li>
+                <li><a href="#">Terms of Service</a></li>
+                <li><a href="#">Cookie Policy</a></li>
+                <li><a href="#">GDPR</a></li>
+                <li><a href="#">Disclaimer</a></li>
+              </ul>
+            </div>
+          </div>
+
+          <!-- Footer Bottom -->
+          <div class="footer-bottom">
+            <div class="footer-left">
+              <p>&copy; 2026 FaceAuth. All rights reserved.</p>
+            </div>
+            <div class="footer-center">
+              <p>Built with 🔐 Security First Approach</p>
+            </div>
+            <div class="footer-right">
+              <a href="#" class="footer-back-to-top">Back to Top ↑</a>
+            </div>
+          </div>
+        </div>
+      </footer>
+      {% endblock %}
+    </div>
+
+    <script src="{{ url_for('static', filename='js/main.js') }}"></script>
+  </body>
+</html>

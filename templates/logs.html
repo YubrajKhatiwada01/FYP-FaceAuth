@@ -1,0 +1,129 @@
+{% extends "dashboard_base.html" %}
+
+{% block title %}FaceAuth | System Logs{% endblock %}
+
+{% block dashboard_title %}System Logs{% endblock %}
+{% block dashboard_subtitle %}View and analyze system events and activities{% endblock %}
+{% block dashboard_notifications_count %}0{% endblock %}
+
+{% block dashboard_content %}
+<!-- Filters -->
+<section class="logs-filters">
+  <form method="get" action="{{ url_for('logs') }}" style="display:contents">
+    <div class="filter-group">
+      <label for="event_type_filter">Event Type</label>
+      <select id="event_type_filter" name="event_type" class="filter-select">
+        {% for et in event_types %}
+        <option value="{{ et }}" {% if et == selected_event %}selected{% endif %}>{{ et }}</option>
+        {% endfor %}
+      </select>
+    </div>
+    <div class="filter-group">
+      <label>Date Range</label>
+      <input type="date" name="date_from" class="filter-input" value="{{ date_from }}">
+      <span>to</span>
+      <input type="date" name="date_to" class="filter-input" value="{{ date_to }}">
+    </div>
+    <button type="submit" class="btn btn-primary">Apply Filters</button>
+    <a href="{{ url_for('logs') }}" class="btn btn-secondary">Reset</a>
+  </form>
+</section>
+
+<!-- Logs Table -->
+<section class="logs-table-section">
+  <div class="logs-table">
+    <div class="table-header">
+      <div class="col-time">Timestamp</div>
+      <div class="col-event">Event Type</div>
+      <div class="col-user">User</div>
+      <div class="col-access-point">Access Point</div>
+      <div class="col-status">Status</div>
+      <div class="col-details">Details</div>
+    </div>
+
+    <div class="table-body">
+      {% for log in logs %}
+      <div class="table-row">
+        <div class="col-time">{{ log.timestamp }}</div>
+        <div class="col-event">
+          {% set et = log.event_type %}
+          {% if et == 'Access Granted' %}
+            <span class="event-badge badge-success">{{ et }}</span>
+          {% elif et == 'Access Denied' %}
+            <span class="event-badge badge-danger">{{ et }}</span>
+          {% elif et in ['Login', 'Logout'] %}
+            <span class="event-badge badge-info">{{ et }}</span>
+          {% elif 'Delete' in et %}
+            <span class="event-badge badge-danger">{{ et }}</span>
+          {% elif 'Create' in et or 'Update' in et %}
+            <span class="event-badge badge-warning">{{ et }}</span>
+          {% else %}
+            <span class="event-badge badge-info">{{ et }}</span>
+          {% endif %}
+        </div>
+        <div class="col-user">{{ log.username or 'System' }}</div>
+        <div class="col-access-point">{{ log.access_point or 'N/A' }}</div>
+        <div class="col-status">
+          {% if log.status in ['Success', 'Completed'] %}
+            <span class="status-indicator active">{{ log.status }}</span>
+          {% elif log.status == 'Failed' %}
+            <span class="status-indicator inactive">{{ log.status }}</span>
+          {% else %}
+            <span class="status-indicator warning">{{ log.status }}</span>
+          {% endif %}
+        </div>
+        <div class="col-details">
+          <button class="btn-icon" title="{{ log.details or 'No details' }}"
+            onclick="showDetails(this)" data-details="{{ log.details|e }}">
+            <svg width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2">
+              <path d="M1 12s4-8 11-8 11 8 11 8-4 8-11 8-11-8-11-8z"></path>
+              <circle cx="12" cy="12" r="3"></circle>
+            </svg>
+          </button>
+        </div>
+      </div>
+      {% else %}
+      <div class="table-row">
+        <div style="grid-column:1/-1;padding:24px;text-align:center;color:var(--muted)">
+          No logs found for the selected filters.
+        </div>
+      </div>
+      {% endfor %}
+    </div>
+  </div>
+</section>
+
+<!-- Details Modal -->
+<div class="modal" id="detailsModal" role="dialog" aria-modal="true" aria-labelledby="detailsTitle">
+  <div class="modal-content">
+    <div class="modal-header">
+      <h2 id="detailsTitle">Log Details</h2>
+      <button class="modal-close" onclick="document.getElementById('detailsModal').classList.remove('active')"
+        aria-label="Close">&times;</button>
+    </div>
+    <div class="modal-body">
+      <p id="detailsText" style="color:var(--text);line-height:1.6"></p>
+    </div>
+    <div class="modal-footer">
+      <button class="btn btn-secondary"
+        onclick="document.getElementById('detailsModal').classList.remove('active')">Close</button>
+    </div>
+  </div>
+</div>
+
+<!-- Pagination count -->
+<div class="pagination">
+  <p style="color:var(--muted);font-size:.9rem;margin:0">
+    Showing {{ logs|length }} record{{ 's' if logs|length != 1 else '' }}
+    {% if selected_event %} — filtered by "{{ selected_event }}"{% endif %}
+  </p>
+</div>
+
+<script>
+function showDetails(btn) {
+  const details = btn.getAttribute('data-details') || 'No additional details available.';
+  document.getElementById('detailsText').textContent = details;
+  document.getElementById('detailsModal').classList.add('active');
+}
+</script>
+{% endblock %}

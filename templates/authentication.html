@@ -1,0 +1,566 @@
+{% extends "dashboard_base.html" %}
+
+{% block title %}FaceAuth | Face Authentication{% endblock %}
+{% block dashboard_title %}Face Authentication{% endblock %}
+{% block dashboard_subtitle %}Live camera facial recognition and access verification{% endblock %}
+{% block dashboard_notifications_count %}0{% endblock %}
+
+{% block dashboard_content %}
+
+<!-- ── Layout: camera feed left, controls right ─────────────────────────── -->
+<div class="auth-layout">
+
+  <!-- ── Left: Camera panel ─────────────────────────────────────────────── -->
+  <div class="camera-panel">
+
+    <!-- Status bar above the feed -->
+    <div class="camera-status-bar">
+      <div class="cam-status-dot" id="camStatusDot"></div>
+      <span id="camStatusLabel">Camera inactive</span>
+      <span class="cam-separator">|</span>
+      <span id="camResLabel">—</span>
+      <div class="cam-corner-actions">
+        <button class="cam-icon-btn" id="btnFullscreen" title="Fullscreen" onclick="toggleFullscreen()">
+          <svg width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2">
+            <path d="M8 3H5a2 2 0 0 0-2 2v3m18 0V5a2 2 0 0 0-2-2h-3m0 18h3a2 2 0 0 0 2-2v-3M3 16v3a2 2 0 0 0 2 2h3"></path>
+          </svg>
+        </button>
+        <button class="cam-icon-btn" id="btnSnapshot" title="Capture snapshot" onclick="captureSnapshot()" disabled>
+          <svg width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2">
+            <path d="M23 19a2 2 0 0 1-2 2H3a2 2 0 0 1-2-2V8a2 2 0 0 1 2-2h4l2-3h6l2 3h4a2 2 0 0 1 2 2z"></path>
+            <circle cx="12" cy="13" r="4"></circle>
+          </svg>
+        </button>
+      </div>
+    </div>
+
+    <!-- The actual video feed -->
+    <div class="camera-feed-wrap" id="cameraFeedWrap">
+      <!-- Idle placeholder shown before camera starts -->
+      <div class="camera-placeholder" id="cameraPlaceholder">
+        <div class="cam-placeholder-icon">
+          <svg width="64" height="64" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1">
+            <path d="M23 7 L16 12 L23 17 Z"></path>
+            <rect x="1" y="5" width="15" height="14" rx="2" ry="2"></rect>
+          </svg>
+        </div>
+        <p class="cam-placeholder-title">Camera not started</p>
+        <p class="cam-placeholder-sub">Click <strong>Start Camera</strong> to begin live scanning</p>
+      </div>
+
+      <!-- Video element — hidden until camera is active -->
+      <video id="cameraFeed" autoplay playsinline muted
+             class="camera-video" style="display:none"
+             aria-label="Live camera feed"></video>
+
+      <!-- Scan overlay drawn on top of the video -->
+      <canvas id="scanOverlay" class="scan-overlay" style="display:none"
+              aria-hidden="true"></canvas>
+
+      <!-- Corner bracket decorations -->
+      <div class="corner-bracket top-left"    aria-hidden="true"></div>
+      <div class="corner-bracket top-right"   aria-hidden="true"></div>
+      <div class="corner-bracket bottom-left" aria-hidden="true"></div>
+      <div class="corner-bracket bottom-right"aria-hidden="true"></div>
+
+      <!-- Scanning line animation -->
+      <div class="scan-line" id="scanLine" style="display:none" aria-hidden="true"></div>
+    </div>
+
+    <!-- Snapshot preview strip -->
+    <div class="snapshot-strip" id="snapshotStrip" style="display:none">
+      <p class="strip-label">Captured snapshots</p>
+      <div class="strip-thumbs" id="stripThumbs"></div>
+    </div>
+  </div><!-- /camera-panel -->
+
+
+  <!-- ── Right: Controls & result panel ────────────────────────────────── -->
+  <div class="auth-controls">
+
+    <!-- Camera controls card -->
+    <div class="auth-card">
+      <h3 class="auth-card-title">
+        <svg width="18" height="18" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2">
+          <circle cx="12" cy="12" r="3"></circle>
+          <path d="M12 1v4M12 19v4M4.22 4.22l2.83 2.83M16.95 16.95l2.83 2.83M1 12h4M19 12h4M4.22 19.78l2.83-2.83M16.95 7.05l2.83-2.83"></path>
+        </svg>
+        Camera Controls
+      </h3>
+
+      <!-- Device selector -->
+      <div class="form-group">
+        <label class="form-label">Camera Device</label>
+        <select id="deviceSelect" class="form-select">
+          <option value="">— Select camera —</option>
+        </select>
+      </div>
+
+      <!-- Mirror toggle -->
+      <div class="auth-toggle-row">
+        <span>Mirror video</span>
+        <label class="toggle-switch-wrap">
+          <input type="checkbox" id="mirrorToggle" checked onchange="applyMirror()">
+          <span class="toggle-track"></span>
+        </label>
+      </div>
+
+      <!-- Start / Stop -->
+      <div class="auth-btn-row">
+        <button class="btn btn-primary" id="btnStart" onclick="startCamera()">
+          <svg width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2">
+            <polygon points="5 3 19 12 5 21 5 3"></polygon>
+          </svg>
+          Start Camera
+        </button>
+        <button class="btn btn-secondary" id="btnStop" onclick="stopCamera()" disabled>
+          <svg width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2">
+            <rect x="6" y="4" width="4" height="16"></rect>
+            <rect x="14" y="4" width="4" height="16"></rect>
+          </svg>
+          Stop
+        </button>
+      </div>
+    </div>
+
+    <!-- Scan / recognition card -->
+    <div class="auth-card">
+      <h3 class="auth-card-title">
+        <svg width="18" height="18" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2">
+          <path d="M1 12s4-8 11-8 11 8 11 8-4 8-11 8-11-8-11-8z"></path>
+          <circle cx="12" cy="12" r="3"></circle>
+        </svg>
+        Face Scan
+      </h3>
+
+      <!-- Access point selector -->
+      <div class="form-group">
+        <label class="form-label">Access Point</label>
+        <select id="accessPointSelect" class="form-select">
+          <option value="Camera Station">Camera Station</option>
+          {% for ap in users %}{% endfor %}{# placeholder — access points passed via dedicated query #}
+          <option value="Main Entry">Main Entry</option>
+          <option value="Conference Room">Conference Room</option>
+          <option value="Server Room">Server Room</option>
+          <option value="Parking Garage">Parking Garage</option>
+        </select>
+      </div>
+
+      <!-- Scan button -->
+      <button class="btn btn-primary scan-btn" id="btnScan" onclick="runScan()" disabled>
+        <svg width="18" height="18" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2">
+          <path d="M2 12h1M21 12h1M12 2v1M12 21v1"></path>
+          <path d="M4.93 4.93l.7.7M18.36 18.36l.71.71M4.93 19.07l.7-.7M18.36 5.64l.71-.71"></path>
+          <circle cx="12" cy="12" r="5"></circle>
+        </svg>
+        Scan Face
+      </button>
+
+      <!-- Result display -->
+      <div class="auth-result" id="authResult" style="display:none">
+        <div class="result-icon" id="resultIcon"></div>
+        <div class="result-body">
+          <p class="result-status" id="resultStatus"></p>
+          <p class="result-detail" id="resultDetail"></p>
+        </div>
+      </div>
+    </div>
+
+    <!-- Live log feed card -->
+    <div class="auth-card auth-card-log">
+      <h3 class="auth-card-title">
+        <svg width="18" height="18" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2">
+          <path d="M21 15a2 2 0 0 1-2 2H7l-4 4V5a2 2 0 0 1 2-2h14a2 2 0 0 1 2 2z"></path>
+        </svg>
+        Session Log
+        <button class="clear-log-btn" onclick="clearLog()" title="Clear session log">Clear</button>
+      </h3>
+      <div class="auth-log-feed" id="authLogFeed">
+        <p class="log-empty">No events yet this session.</p>
+      </div>
+    </div>
+
+  </div><!-- /auth-controls -->
+</div><!-- /auth-layout -->
+
+
+<!-- ══════════════════════════════════════════════════════════════════════
+     JAVASCRIPT
+     ══════════════════════════════════════════════════════════════════════ -->
+<script>
+/* ── State ──────────────────────────────────────────────────────────────── */
+let stream        = null;
+let animFrame     = null;
+let snapshotCount = 0;
+
+const video       = document.getElementById('cameraFeed');
+const canvas      = document.getElementById('scanOverlay');
+const ctx         = canvas.getContext('2d');
+const placeholder = document.getElementById('cameraPlaceholder');
+const scanLine    = document.getElementById('scanLine');
+
+/* ── On page load: enumerate cameras ────────────────────────────────────── */
+window.addEventListener('DOMContentLoaded', async () => {
+  await enumerateDevices();
+});
+
+async function enumerateDevices() {
+  try {
+    // Request permission first so device labels are populated
+    const tmp = await navigator.mediaDevices.getUserMedia({ video: true });
+    tmp.getTracks().forEach(t => t.stop());
+  } catch (_) {}
+
+  try {
+    const devices = await navigator.mediaDevices.enumerateDevices();
+    const sel     = document.getElementById('deviceSelect');
+    sel.innerHTML = '';
+    const cameras = devices.filter(d => d.kind === 'videoinput');
+    if (cameras.length === 0) {
+      sel.innerHTML = '<option value="">No camera found</option>';
+      return;
+    }
+    cameras.forEach((cam, i) => {
+      const opt   = document.createElement('option');
+      opt.value   = cam.deviceId;
+      opt.text    = cam.label || `Camera ${i + 1}`;
+      sel.appendChild(opt);
+    });
+  } catch (err) {
+    logEvent('error', 'Could not list camera devices: ' + err.message);
+  }
+}
+
+/* ── Start camera ───────────────────────────────────────────────────────── */
+async function startCamera() {
+  const deviceId = document.getElementById('deviceSelect').value;
+  const constraints = {
+    video: deviceId
+      ? { deviceId: { exact: deviceId }, width: { ideal: 1280 }, height: { ideal: 720 } }
+      : { width: { ideal: 1280 }, height: { ideal: 720 } },
+    audio: false
+  };
+
+  try {
+    stream = await navigator.mediaDevices.getUserMedia(constraints);
+    video.srcObject = stream;
+    await video.play();
+
+    // Show video, hide placeholder
+    placeholder.style.display = 'none';
+    video.style.display       = 'block';
+    canvas.style.display      = 'block';
+    scanLine.style.display    = 'block';
+
+    applyMirror();
+    resizeCanvas();
+
+    // Update UI state
+    setStatus(true);
+    document.getElementById('btnStart').disabled    = true;
+    document.getElementById('btnStop').disabled     = false;
+    document.getElementById('btnScan').disabled     = false;
+    document.getElementById('btnSnapshot').disabled = false;
+
+    const t = stream.getVideoTracks()[0].getSettings();
+    document.getElementById('camResLabel').textContent =
+      t.width && t.height ? `${t.width}×${t.height}` : '';
+
+    logEvent('info', 'Camera started.');
+    drawOverlay();
+  } catch (err) {
+    const msg = err.name === 'NotAllowedError'
+      ? 'Camera access denied. Allow camera permission and try again.'
+      : 'Could not open camera: ' + err.message;
+    logEvent('error', msg);
+    showResult('denied', 'Permission Error', msg);
+  }
+}
+
+/* ── Stop camera ────────────────────────────────────────────────────────── */
+function stopCamera() {
+  if (stream) {
+    stream.getTracks().forEach(t => t.stop());
+    stream = null;
+  }
+  if (animFrame) { cancelAnimationFrame(animFrame); animFrame = null; }
+
+  video.srcObject      = null;
+  video.style.display  = 'none';
+  canvas.style.display = 'none';
+  scanLine.style.display = 'none';
+  placeholder.style.display = 'flex';
+  ctx.clearRect(0, 0, canvas.width, canvas.height);
+
+  setStatus(false);
+  document.getElementById('btnStart').disabled    = false;
+  document.getElementById('btnStop').disabled     = true;
+  document.getElementById('btnScan').disabled     = true;
+  document.getElementById('btnSnapshot').disabled = true;
+  document.getElementById('camResLabel').textContent = '—';
+  hideResult();
+  logEvent('info', 'Camera stopped.');
+}
+
+/* ── Mirror helper ─────────────────────────────────────────────────────── */
+function applyMirror() {
+  const mirror = document.getElementById('mirrorToggle').checked;
+  video.style.transform  = mirror ? 'scaleX(-1)' : '';
+  canvas.style.transform = mirror ? 'scaleX(-1)' : '';
+}
+
+/* ── Canvas sizing ─────────────────────────────────────────────────────── */
+function resizeCanvas() {
+  canvas.width  = video.videoWidth  || video.clientWidth;
+  canvas.height = video.videoHeight || video.clientHeight;
+}
+
+window.addEventListener('resize', () => { if (stream) resizeCanvas(); });
+video.addEventListener('loadedmetadata', resizeCanvas);
+
+/* ── Overlay drawing loop ──────────────────────────────────────────────── */
+function drawOverlay() {
+  if (!stream) return;
+  resizeCanvas();
+  ctx.clearRect(0, 0, canvas.width, canvas.height);
+
+  const w = canvas.width, h = canvas.height;
+  const cx = w / 2, cy = h / 2;
+  // Face oval guide
+  const rx = w * 0.18, ry = h * 0.28;
+
+  ctx.save();
+  ctx.strokeStyle = 'rgba(21, 213, 238, 0.55)';
+  ctx.lineWidth   = 2;
+  ctx.setLineDash([8, 6]);
+  ctx.beginPath();
+  ctx.ellipse(cx, cy, rx, ry, 0, 0, Math.PI * 2);
+  ctx.stroke();
+  ctx.setLineDash([]);
+
+  // Grid lines (subtle)
+  ctx.strokeStyle = 'rgba(21,213,238,0.06)';
+  ctx.lineWidth   = 1;
+  for (let x = 0; x < w; x += 64) {
+    ctx.beginPath(); ctx.moveTo(x, 0); ctx.lineTo(x, h); ctx.stroke();
+  }
+  for (let y = 0; y < h; y += 64) {
+    ctx.beginPath(); ctx.moveTo(0, y); ctx.lineTo(w, y); ctx.stroke();
+  }
+  ctx.restore();
+
+  animFrame = requestAnimationFrame(drawOverlay);
+}
+
+/* ── Scan (simulated recognition) ─────────────────────────────────────── */
+function runScan() {
+  if (!stream) return;
+  const btn = document.getElementById('btnScan');
+  btn.disabled = true;
+  btn.innerHTML = `
+    <svg class="spin" width="18" height="18" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2">
+      <path d="M21 12a9 9 0 1 1-6.22-8.56"></path>
+    </svg>
+    Scanning…`;
+
+  hideResult();
+  logEvent('info', 'Scanning…');
+
+  // Capture a frame from the video to simulate a scan
+  const snap  = document.createElement('canvas');
+  snap.width  = video.videoWidth;
+  snap.height = video.videoHeight;
+  const sCtx  = snap.getContext('2d');
+  if (document.getElementById('mirrorToggle').checked) {
+    sCtx.translate(snap.width, 0);
+    sCtx.scale(-1, 1);
+  }
+  sCtx.drawImage(video, 0, 0, snap.width, snap.height);
+
+  const accessPoint = document.getElementById('accessPointSelect').value;
+
+  // Simulate async processing (1.5 s)
+  setTimeout(() => {
+    const granted = Math.random() > 0.35;   // ~65 % success rate for demo
+    const name    = granted ? pickRandomUser() : null;
+    const conf    = granted ? (Math.random() * 8 + 91).toFixed(1) : null; // 91–99 %
+
+    if (granted && name) {
+      showResult('granted', `Access Granted — ${name}`,
+        `Confidence ${conf}% · ${accessPoint}`);
+      logEvent('success', `Access Granted: ${name} @ ${accessPoint} (${conf}%)`);
+      postLog('Access Granted', name, accessPoint, 'Success',
+        `Facial match confidence ${conf}%`);
+    } else {
+      showResult('denied', 'Access Denied',
+        'No matching face found in the system.');
+      logEvent('warning', `Access Denied @ ${accessPoint}`);
+      postLog('Access Denied', 'Unknown', accessPoint, 'Failed',
+        'No matching face found');
+    }
+
+    btn.disabled = false;
+    btn.innerHTML = `
+      <svg width="18" height="18" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2">
+        <path d="M2 12h1M21 12h1M12 2v1M12 21v1"></path>
+        <path d="M4.93 4.93l.7.7M18.36 18.36l.71.71M4.93 19.07l.7-.7M18.36 5.64l.71-.71"></path>
+        <circle cx="12" cy="12" r="5"></circle>
+      </svg>
+      Scan Face`;
+  }, 1500);
+}
+
+/* ── Snapshot ─────────────────────────────────────────────────────────── */
+function captureSnapshot() {
+  if (!stream) return;
+  const snap  = document.createElement('canvas');
+  snap.width  = video.videoWidth;
+  snap.height = video.videoHeight;
+  const sCtx  = snap.getContext('2d');
+  if (document.getElementById('mirrorToggle').checked) {
+    sCtx.translate(snap.width, 0); sCtx.scale(-1, 1);
+  }
+  sCtx.drawImage(video, 0, 0);
+
+  const url    = snap.toDataURL('image/jpeg', 0.85);
+  const strip  = document.getElementById('snapshotStrip');
+  const thumbs = document.getElementById('stripThumbs');
+
+  strip.style.display = 'flex';
+  snapshotCount++;
+
+  const wrap = document.createElement('div');
+  wrap.className = 'snap-thumb-wrap';
+
+  const img      = document.createElement('img');
+  img.src        = url;
+  img.className  = 'snap-thumb';
+  img.alt        = `Snapshot ${snapshotCount}`;
+
+  const label    = document.createElement('span');
+  label.className = 'snap-label';
+  label.textContent = `#${snapshotCount}`;
+
+  // Download link
+  const dl    = document.createElement('a');
+  dl.href     = url;
+  dl.download = `snapshot-${snapshotCount}.jpg`;
+  dl.className = 'snap-dl';
+  dl.title    = 'Download';
+  dl.innerHTML = `<svg width="12" height="12" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2">
+    <path d="M21 15v4a2 2 0 0 1-2 2H5a2 2 0 0 1-2-2v-4"></path>
+    <polyline points="7 10 12 15 17 10"></polyline>
+    <line x1="12" y1="15" x2="12" y2="3"></line></svg>`;
+
+  wrap.appendChild(img);
+  wrap.appendChild(label);
+  wrap.appendChild(dl);
+  thumbs.prepend(wrap);
+
+  logEvent('info', `Snapshot #${snapshotCount} captured.`);
+}
+
+/* ── Fullscreen ─────────────────────────────────────────────────────────── */
+function toggleFullscreen() {
+  const wrap = document.getElementById('cameraFeedWrap');
+  if (!document.fullscreenElement) {
+    wrap.requestFullscreen && wrap.requestFullscreen();
+  } else {
+    document.exitFullscreen && document.exitFullscreen();
+  }
+}
+
+/* ── UI helpers ──────────────────────────────────────────────────────────── */
+function setStatus(active) {
+  const dot   = document.getElementById('camStatusDot');
+  const label = document.getElementById('camStatusLabel');
+  dot.classList.toggle('active', active);
+  label.textContent = active ? 'Camera active' : 'Camera inactive';
+}
+
+function showResult(type, status, detail) {
+  const box    = document.getElementById('authResult');
+  const icon   = document.getElementById('resultIcon');
+  const sEl    = document.getElementById('resultStatus');
+  const dEl    = document.getElementById('resultDetail');
+
+  box.style.display  = 'flex';
+  box.className      = 'auth-result result-' + type;
+  sEl.textContent    = status;
+  dEl.textContent    = detail;
+
+  if (type === 'granted') {
+    icon.innerHTML = `<svg width="28" height="28" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.5">
+      <polyline points="20 6 9 17 4 12"></polyline></svg>`;
+  } else if (type === 'denied') {
+    icon.innerHTML = `<svg width="28" height="28" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.5">
+      <line x1="18" y1="6" x2="6" y2="18"></line><line x1="6" y1="6" x2="18" y2="18"></line></svg>`;
+  } else {
+    icon.innerHTML = `<svg width="28" height="28" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.5">
+      <circle cx="12" cy="12" r="10"></circle>
+      <line x1="12" y1="8" x2="12" y2="12"></line>
+      <line x1="12" y1="16" x2="12.01" y2="16"></line></svg>`;
+  }
+}
+
+function hideResult() {
+  document.getElementById('authResult').style.display = 'none';
+}
+
+/* ── Session log feed ───────────────────────────────────────────────────── */
+function logEvent(type, message) {
+  const feed = document.getElementById('authLogFeed');
+  const empty = feed.querySelector('.log-empty');
+  if (empty) empty.remove();
+
+  const now  = new Date();
+  const time = now.toTimeString().slice(0, 8);
+
+  const row  = document.createElement('div');
+  row.className = `log-row log-${type}`;
+  row.innerHTML = `<span class="log-time">${time}</span><span class="log-msg">${message}</span>`;
+  feed.prepend(row);
+
+  // Keep max 50 entries
+  while (feed.children.length > 50) feed.lastChild.remove();
+}
+
+function clearLog() {
+  const feed = document.getElementById('authLogFeed');
+  feed.innerHTML = '<p class="log-empty">No events yet this session.</p>';
+}
+
+/* ── Pick a random registered user (for demo simulation) ─────────────── */
+const registeredUsers = [
+  {% for user in users %}
+    {% if user.status == 'Active' %}"{{ user.full_name|e }}"{% if not loop.last %},{% endif %}{% endif %}
+  {% endfor %}
+];
+
+function pickRandomUser() {
+  if (!registeredUsers.length) return 'Registered User';
+  return registeredUsers[Math.floor(Math.random() * registeredUsers.length)];
+}
+
+/* ── POST log entry to server ─────────────────────────────────────────── */
+function postLog(eventType, username, accessPoint, status, details) {
+  fetch('{{ url_for("authentication_log") }}', {
+    method: 'POST',
+    headers: { 'Content-Type': 'application/json',
+               'X-CSRFToken': '{{ csrf_token() }}' },
+    body: JSON.stringify({
+      event_type:   eventType,
+      username:     username,
+      access_point: accessPoint,
+      status:       status,
+      details:      details
+    })
+  });
+}
+
+/* ── Cleanup on page leave ────────────────────────────────────────────── */
+window.addEventListener('beforeunload', () => {
+  if (stream) stream.getTracks().forEach(t => t.stop());
+});
+</script>
+{% endblock %}

@@ -7,8 +7,10 @@
     <link rel="icon" type="image/png" href="{{ url_for('static', filename='images/final logo.png') }}">
     <link rel="stylesheet" href="{{ url_for('static', filename='css/style.css') }}">
   </head>
-  <body{% if body_class %} class="{{ body_class }}"{% endif %}>
+  <body{% if body_class %} class="{{ body_class }}{% if active_page in ['dashboard', 'users', 'access_control', 'logs', 'settings', 'authentication'] %} dashboard-page{% endif %}"{% elif active_page in ['dashboard', 'users', 'access_control', 'logs', 'settings', 'authentication'] %} class="dashboard-page"{% endif %}>
     <div class="site-shell">
+      {% set dashboard_pages = ['dashboard', 'users', 'access_control', 'logs', 'settings', 'authentication'] %}
+      {% if active_page not in dashboard_pages %}
       {% block header %}
         <header class="nav-shell">
           <a class="brand" href="{{ url_for('landing') }}" aria-label="FaceAuth home">
@@ -36,11 +38,13 @@
           <a class="nav-cta" href="{{ url_for('login') }}">Initialize Access</a>
         </header>
       {% endblock %}
+      {% endif %}
 
       <main>
         {% block content %}{% endblock %}
       </main>
 
+      {% if active_page not in dashboard_pages %}
       {% block footer %}
       <footer class="site-footer">
         <div class="footer-container">
@@ -142,6 +146,7 @@
         </div>
       </footer>
       {% endblock %}
+      {% endif %}
     </div>
 
     <script src="{{ url_for('static', filename='js/main.js') }}"></script>

@@ -1,0 +1,187 @@
+{% extends "dashboard_base.html" %}
+
+{% block title %}FaceAuth | Settings{% endblock %}
+
+{% block dashboard_title %}Settings{% endblock %}
+{% block dashboard_subtitle %}Configure system preferences and options{% endblock %}
+{% block dashboard_notifications_count %}0{% endblock %}
+
+{% block dashboard_content %}
+<div class="settings-grid">
+  <!-- System Settings -->
+  <section class="settings-section">
+    <h2>System Settings</h2>
+    
+    <div class="setting-item">
+      <div class="setting-header">
+        <label>System Mode</label>
+        <p class="setting-description">Choose between high security and standard modes</p>
+      </div>
+      <select class="setting-select">
+        <option>High Security Mode</option>
+        <option>Standard Mode</option>
+        <option>Maintenance Mode</option>
+      </select>
+    </div>
+
+    <div class="setting-item">
+      <div class="setting-header">
+        <label>Recognition Sensitivity</label>
+        <p class="setting-description">Adjust facial recognition accuracy threshold</p>
+      </div>
+      <input type="range" class="setting-slider" min="0" max="100" value="85">
+      <span class="slider-value">85%</span>
+    </div>
+
+    <div class="setting-item">
+      <div class="setting-header">
+        <label>Multi-Factor Authentication</label>
+        <p class="setting-description">Require additional verification for access</p>
+      </div>
+      <label class="setting-toggle">
+        <input type="checkbox" checked>
+        <span class="toggle-switch"></span>
+        <span>Enabled</span>
+      </label>
+    </div>
+
+    <div class="setting-item">
+      <div class="setting-header">
+        <label>Enable Audit Logging</label>
+        <p class="setting-description">Record all system activities for compliance</p>
+      </div>
+      <label class="setting-toggle">
+        <input type="checkbox" checked>
+        <span class="toggle-switch"></span>
+        <span>Enabled</span>
+      </label>
+    </div>
+  </section>
+
+  <!-- Security Settings -->
+  <section class="settings-section">
+    <h2>Security Settings</h2>
+
+    <div class="setting-item">
+      <div class="setting-header">
+        <label>Session Timeout</label>
+        <p class="setting-description">Automatically logout after inactivity</p>
+      </div>
+      <select class="setting-select">
+        <option>15 minutes</option>
+        <option>30 minutes</option>
+        <option>1 hour</option>
+        <option>2 hours</option>
+      </select>
+    </div>
+
+    <div class="setting-item">
+      <div class="setting-header">
+        <label>Password Policy</label>
+        <p class="setting-description">Set minimum password requirements</p>
+      </div>
+      <div class="setting-checkbox-group">
+        <label class="setting-checkbox">
+          <input type="checkbox" checked>
+          <span>Minimum 12 characters</span>
+        </label>
+        <label class="setting-checkbox">
+          <input type="checkbox" checked>
+          <span>Require special characters</span>
+        </label>
+        <label class="setting-checkbox">
+          <input type="checkbox">
+          <span>Require numbers and letters</span>
+        </label>
+      </div>
+    </div>
+
+    <div class="setting-item">
+      <div class="setting-header">
+        <label>IP Whitelist</label>
+        <p class="setting-description">Restrict access to specific IP addresses</p>
+      </div>
+      <label class="setting-toggle">
+        <input type="checkbox">
+        <span class="toggle-switch"></span>
+        <span>Enabled</span>
+      </label>
+    </div>
+  </section>
+
+  <!-- Notification Settings -->
+  <section class="settings-section">
+    <h2>Notification Settings</h2>
+
+    <div class="setting-item">
+      <div class="setting-header">
+        <label>Email Notifications</label>
+        <p class="setting-description">Receive alerts via email</p>
+      </div>
+      <label class="setting-toggle">
+        <input type="checkbox" checked>
+        <span class="toggle-switch"></span>
+        <span>Enabled</span>
+      </label>
+    </div>
+
+    <div class="setting-item">
+      <div class="setting-header">
+        <label>Failed Access Alerts</label>
+        <p class="setting-description">Alert on repeated failed access attempts</p>
+      </div>
+      <label class="setting-toggle">
+        <input type="checkbox" checked>
+        <span class="toggle-switch"></span>
+        <span>Enabled</span>
+      </label>
+    </div>
+
+    <div class="setting-item">
+      <div class="setting-header">
+        <label>System Alerts</label>
+        <p class="setting-description">Receive system maintenance and update notifications</p>
+      </div>
+      <label class="setting-toggle">
+        <input type="checkbox" checked>
+        <span class="toggle-switch"></span>
+        <span>Enabled</span>
+      </label>
+    </div>
+  </section>
+
+  <!-- Backup & Maintenance -->
+  <section class="settings-section">
+    <h2>Backup & Maintenance</h2>
+
+    <div class="setting-item">
+      <div class="setting-header">
+        <label>Automatic Backups</label>
+        <p class="setting-description">Schedule regular database backups</p>
+      </div>
+      <select class="setting-select">
+        <option>Daily at 2:00 AM</option>
+        <option>Every 6 hours</option>
+        <option>Weekly on Sunday</option>
+        <option>Monthly on 1st</option>
+      </select>
+    </div>
+
+    <div class="setting-actions">
+      <button class="btn btn-primary">Save Changes</button>
+      <button class="btn btn-outline">Reset to Default</button>
+      <button class="btn btn-outline">Export Settings</button>
+    </div>
+  </section>
+</div>
+
+<script>
+  // Handle slider value display
+  const sliders = document.querySelectorAll('.setting-slider');
+  sliders.forEach(slider => {
+    slider.addEventListener('input', function() {
+      this.parentElement.querySelector('.slider-value').textContent = this.value + '%';
+    });
+  });
+</script>
+{% endblock %}

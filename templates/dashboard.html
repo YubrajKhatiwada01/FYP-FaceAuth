@@ -1,0 +1,120 @@
+{% extends "dashboard_base.html" %}
+
+{% block title %}FaceAuth | Dashboard{% endblock %}
+
+{% block dashboard_title %}Dashboard{% endblock %}
+{% block dashboard_subtitle %}Welcome back, {{ operator_id }}{% endblock %}
+{% block dashboard_notifications_count %}3{% endblock %}
+
+{% block dashboard_content %}
+<!-- Welcome Card -->
+<section class="welcome-card">
+  <div class="welcome-content">
+    <h2>Welcome to FaceAuth Dashboard</h2>
+    <p>Monitor your facial recognition system, manage access control, and view real-time analytics.</p>
+  </div>
+  <div class="welcome-icon">
+    <svg width="64" height="64" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.5">
+      <path d="M20 21v-2a4 4 0 0 0-4-4H8a4 4 0 0 0-4 4v2"></path>
+      <circle cx="12" cy="7" r="4"></circle>
+    </svg>
+  </div>
+</section>
+
+<!-- Stats Grid -->
+<section class="stats-grid">
+  <div class="stat-card">
+    <div class="stat-icon access">
+      <svg width="24" height="24" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2">
+        <polyline points="22 4 2 4 2 14 22 14 22 4"></polyline>
+        <line x1="2" y1="10" x2="22" y2="10"></line>
+        <circle cx="12" cy="21" r="1"></circle>
+      </svg>
+    </div>
+    <div class="stat-content">
+      <p class="stat-label">Access Granted</p>
+      <h3 class="stat-value">{{ stats.access_granted }}</h3>
+      <p class="stat-change positive">Total all-time events</p>
+    </div>
+  </div>
+
+  <div class="stat-card">
+    <div class="stat-icon denied">
+      <svg width="24" height="24" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2">
+        <circle cx="12" cy="12" r="10"></circle>
+        <line x1="15" y1="9" x2="9" y2="15"></line>
+        <line x1="9" y1="9" x2="15" y2="15"></line>
+      </svg>
+    </div>
+    <div class="stat-content">
+      <p class="stat-label">Access Denied</p>
+      <h3 class="stat-value">{{ stats.access_denied }}</h3>
+      <p class="stat-change neutral">Requires review</p>
+    </div>
+  </div>
+
+  <div class="stat-card">
+    <div class="stat-icon uptime">
+      <svg width="24" height="24" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2">
+        <polyline points="23 6 13.5 15.5 8.5 10.5 1 17"></polyline>
+        <polyline points="17 6 23 6 23 12"></polyline>
+      </svg>
+    </div>
+    <div class="stat-content">
+      <p class="stat-label">Active Access Points</p>
+      <h3 class="stat-value">{{ stats.active_points }}</h3>
+      <p class="stat-change positive">All systems operational</p>
+    </div>
+  </div>
+
+  <div class="stat-card">
+    <div class="stat-icon users">
+      <svg width="24" height="24" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2">
+        <path d="M17 21v-2a4 4 0 0 0-4-4H5a4 4 0 0 0-4 4v2"></path>
+        <circle cx="9" cy="7" r="4"></circle>
+        <path d="M23 21v-2a4 4 0 0 0-3-3.87"></path>
+        <path d="M16 3.13a4 4 0 0 1 0 7.75"></path>
+      </svg>
+    </div>
+    <div class="stat-content">
+      <p class="stat-label">Active Users</p>
+      <h3 class="stat-value">{{ stats.active_users }}</h3>
+      <p class="stat-change positive">Registered operators</p>
+    </div>
+  </div>
+</section>
+
+<!-- Activity Section -->
+<section class="activity-section">
+  <h2>Recent Activity</h2>
+  <div class="activity-list">
+    {% for log in recent_logs %}
+    <div class="activity-item">
+      <div class="activity-icon
+        {% if log.status == 'Success' or log.status == 'Completed' %}success
+        {% elif log.status == 'Failed' %}warning
+        {% else %}info{% endif %}">
+        {% if log.status == 'Success' or log.status == 'Completed' %}
+        <svg width="20" height="20" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2">
+          <polyline points="20 6 9 17 4 12"></polyline>
+        </svg>
+        {% else %}
+        <svg width="20" height="20" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2">
+          <circle cx="12" cy="12" r="10"></circle>
+          <line x1="12" y1="16" x2="12" y2="12"></line>
+          <line x1="12" y1="8" x2="12.01" y2="8"></line>
+        </svg>
+        {% endif %}
+      </div>
+      <div class="activity-content">
+        <p class="activity-title">{{ log.event_type }}</p>
+        <p class="activity-desc">{{ log.details or (log.username ~ ' — ' ~ (log.access_point or 'System')) }}</p>
+        <p class="activity-time">{{ log.timestamp }}</p>
+      </div>
+    </div>
+    {% else %}
+    <p style="color:var(--muted);padding:16px 0">No recent activity recorded.</p>
+    {% endfor %}
+  </div>
+</section>
+{% endblock %}

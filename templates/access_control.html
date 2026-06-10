@@ -1,0 +1,292 @@
+{% extends "dashboard_base.html" %}
+
+{% block title %}FaceAuth | Access Control{% endblock %}
+
+{% block dashboard_title %}Access Control{% endblock %}
+{% block dashboard_subtitle %}Manage access points and permissions{% endblock %}
+{% block dashboard_notifications_count %}0{% endblock %}
+
+{% block dashboard_content %}
+<!-- Toast -->
+<div id="toast" class="toast" aria-live="polite" aria-atomic="true" style="display:none"></div>
+
+<!-- Access Points Section -->
+<section class="access-points-section">
+  <div class="section-header">
+    <h2>Access Control Points ({{ access_points|length }})</h2>
+    <button class="btn btn-primary" onclick="openAddAPModal()">
+      <svg width="20" height="20" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2">
+        <line x1="12" y1="5" x2="12" y2="19"></line>
+        <line x1="5" y1="12" x2="19" y2="12"></line>
+      </svg>
+      Add Access Point
+    </button>
+  </div>
+
+  <div class="table-wrapper">
+    <table class="access-table">
+      <thead>
+        <tr>
+          <th>Access Point</th>
+          <th>Location</th>
+          <th>Type</th>
+          <th>Entries Today</th>
+          <th>Success Rate</th>
+          <th>Status</th>
+          <th>Last Used</th>
+          <th>Actions</th>
+        </tr>
+      </thead>
+      <tbody id="apTableBody">
+        {% for ap in access_points %}
+        <tr data-id="{{ ap.id }}">
+          <td><strong>{{ ap.name }}</strong></td>
+          <td>{{ ap.location }}</td>
+          <td>{{ ap.type }}</td>
+          <td><span class="stat-value">{{ ap.entries_today }}</span></td>
+          <td><span class="success-rate">{{ "%.1f"|format(ap.success_rate) }}%</span></td>
+          <td>
+            <span class="status-indicator
+              {% if ap.status == 'Active' %}active
+              {% elif ap.status == 'Maintenance' %}warning
+              {% else %}inactive{% endif %}">
+              {{ ap.status }}
+            </span>
+          </td>
+          <td>{{ ap.last_used or 'N/A' }}</td>
+          <td>
+            <button class="action-btn" title="Edit"
+              onclick="openEditAPModal({{ ap.id }}, '{{ ap.name|e }}', '{{ ap.location|e }}', '{{ ap.type|e }}', '{{ ap.status|e }}')">
+              <svg width="18" height="18" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2">
+                <path d="M11 4H4a2 2 0 0 0-2 2v14a2 2 0 0 0 2 2h14a2 2 0 0 0 2-2v-7"></path>
+                <path d="M18.5 2.5a2.121 2.121 0 0 1 3 3L12 15l-4 1 1-4 9.5-9.5z"></path>
+              </svg>
+            </button>
+            <button class="action-btn delete" title="Delete"
+              onclick="openDeleteAPModal({{ ap.id }}, '{{ ap.name|e }}')">
+              <svg width="18" height="18" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2">
+                <polyline points="3 6 5 6 21 6"></polyline>
+                <path d="M19 6v14a2 2 0 0 1-2 2H7a2 2 0 0 1-2-2V6m3 0V4a2 2 0 0 1 2-2h4a2 2 0 0 1 2 2v2"></path>
+                <line x1="10" y1="11" x2="10" y2="17"></line>
+                <line x1="14" y1="11" x2="14" y2="17"></line>
+              </svg>
+            </button>
+          </td>
+        </tr>
+        {% else %}
+        <tr>
+          <td colspan="8" style="text-align:center;padding:24px;color:var(--muted)">
+            No access points configured.
+          </td>
+        </tr>
+        {% endfor %}
+      </tbody>
+    </table>
+  </div>
+</section>
+
+<!-- ======================================================
+     MODALS
+     ====================================================== -->
+
+<!-- Add Access Point Modal -->
+<div class="modal" id="addAPModal" role="dialog" aria-modal="true" aria-labelledby="addAPTitle">
+  <div class="modal-content">
+    <div class="modal-header">
+      <h2 id="addAPTitle">Add Access Point</h2>
+      <button class="modal-close" onclick="closeAddAPModal()" aria-label="Close">&times;</button>
+    </div>
+    <div class="modal-body">
+      <form id="addAPForm">
+        <input type="hidden" name="csrf_token" value="{{ csrf_token() }}">
+        <div class="form-group">
+          <label class="form-label">Name <span class="required">*</span></label>
+          <input type="text" name="name" class="form-input" placeholder="e.g. Main Entry" required>
+        </div>
+        <div class="form-group">
+          <label class="form-label">Location <span class="required">*</span></label>
+          <input type="text" name="location" class="form-input" placeholder="e.g. Building A, Floor 1" required>
+        </div>
+        <div class="form-group">
+          <label class="form-label">Type</label>
+          <select name="type" class="form-select">
+            <option value="Facial Recognition">Facial Recognition</option>
+            <option value="Card Reader">Card Reader</option>
+            <option value="PIN">PIN</option>
+            <option value="Multi-Factor">Multi-Factor</option>
+          </select>
+        </div>
+        <div class="form-group">
+          <label class="form-label">Status</label>
+          <select name="status" class="form-select">
+            <option value="Active">Active</option>
+            <option value="Inactive">Inactive</option>
+            <option value="Maintenance">Maintenance</option>
+          </select>
+        </div>
+      </form>
+    </div>
+    <div class="modal-footer">
+      <button class="btn btn-secondary" onclick="closeAddAPModal()">Cancel</button>
+      <button class="btn btn-primary" onclick="submitAddAP()">Add Access Point</button>
+    </div>
+  </div>
+</div>
+
+<!-- Edit Access Point Modal -->
+<div class="modal" id="editAPModal" role="dialog" aria-modal="true" aria-labelledby="editAPTitle">
+  <div class="modal-content">
+    <div class="modal-header">
+      <h2 id="editAPTitle">Edit Access Point</h2>
+      <button class="modal-close" onclick="closeEditAPModal()" aria-label="Close">&times;</button>
+    </div>
+    <div class="modal-body">
+      <form id="editAPForm">
+        <input type="hidden" name="csrf_token" value="{{ csrf_token() }}">
+        <input type="hidden" id="editAPId">
+        <div class="form-group">
+          <label class="form-label">Name <span class="required">*</span></label>
+          <input type="text" name="name" id="editAPName" class="form-input" required>
+        </div>
+        <div class="form-group">
+          <label class="form-label">Location <span class="required">*</span></label>
+          <input type="text" name="location" id="editAPLocation" class="form-input" required>
+        </div>
+        <div class="form-group">
+          <label class="form-label">Type</label>
+          <select name="type" id="editAPType" class="form-select">
+            <option value="Facial Recognition">Facial Recognition</option>
+            <option value="Card Reader">Card Reader</option>
+            <option value="PIN">PIN</option>
+            <option value="Multi-Factor">Multi-Factor</option>
+          </select>
+        </div>
+        <div class="form-group">
+          <label class="form-label">Status</label>
+          <select name="status" id="editAPStatus" class="form-select">
+            <option value="Active">Active</option>
+            <option value="Inactive">Inactive</option>
+            <option value="Maintenance">Maintenance</option>
+          </select>
+        </div>
+      </form>
+    </div>
+    <div class="modal-footer">
+      <button class="btn btn-secondary" onclick="closeEditAPModal()">Cancel</button>
+      <button class="btn btn-primary" onclick="submitEditAP()">Save Changes</button>
+    </div>
+  </div>
+</div>
+
+<!-- Delete Access Point Modal -->
+<div class="modal" id="deleteAPModal" role="dialog" aria-modal="true" aria-labelledby="deleteAPTitle">
+  <div class="modal-content">
+    <div class="modal-header">
+      <h2 id="deleteAPTitle">Delete Access Point</h2>
+      <button class="modal-close" onclick="closeDeleteAPModal()" aria-label="Close">&times;</button>
+    </div>
+    <div class="modal-body">
+      <div class="confirmation-message">
+        <strong>Warning!</strong> This action cannot be undone.
+      </div>
+      <p style="color:var(--text);margin:16px 0 12px">
+        Are you sure you want to delete the following access point?
+      </p>
+      <div style="background:var(--panel-strong);padding:16px;border-radius:6px;border:1px solid var(--line)">
+        <p style="margin:0 0 6px;color:var(--muted);font-size:.85rem">Access Point</p>
+        <p style="margin:0;color:var(--text);font-weight:600" id="deleteAPNameDisplay"></p>
+      </div>
+      <input type="hidden" id="deleteAPIdField">
+    </div>
+    <div class="modal-footer">
+      <button class="btn btn-secondary" onclick="closeDeleteAPModal()">Cancel</button>
+      <button class="btn btn-danger" onclick="confirmDeleteAP()">Delete</button>
+    </div>
+  </div>
+</div>
+
+<script>
+function showToast(msg, type = 'success') {
+  const t = document.getElementById('toast');
+  t.textContent = msg;
+  t.className = 'toast toast-' + type;
+  t.style.display = 'block';
+  setTimeout(() => { t.style.display = 'none'; }, 3500);
+}
+
+// ── Add ───────────────────────────────────────────────────────────────────
+function openAddAPModal()  { document.getElementById('addAPModal').classList.add('active'); }
+function closeAddAPModal() { document.getElementById('addAPModal').classList.remove('active'); }
+
+function submitAddAP() {
+  const form = document.getElementById('addAPForm');
+  if (!form.checkValidity()) { form.reportValidity(); return; }
+  fetch('{{ url_for("add_access_point") }}', { method: 'POST', body: new FormData(form) })
+    .then(r => r.json())
+    .then(res => {
+      if (res.success) {
+        showToast('Access point added.');
+        closeAddAPModal();
+        setTimeout(() => location.reload(), 800);
+      } else {
+        showToast(res.error || 'Error adding access point.', 'error');
+      }
+    });
+}
+
+// ── Edit ──────────────────────────────────────────────────────────────────
+function openEditAPModal(id, name, location, type, status) {
+  document.getElementById('editAPId').value       = id;
+  document.getElementById('editAPName').value     = name;
+  document.getElementById('editAPLocation').value = location;
+  document.getElementById('editAPType').value     = type;
+  document.getElementById('editAPStatus').value   = status;
+  document.getElementById('editAPModal').classList.add('active');
+}
+function closeEditAPModal() { document.getElementById('editAPModal').classList.remove('active'); }
+
+function submitEditAP() {
+  const form = document.getElementById('editAPForm');
+  if (!form.checkValidity()) { form.reportValidity(); return; }
+  const id   = document.getElementById('editAPId').value;
+  fetch(`/access-control/${id}/edit`, { method: 'POST', body: new FormData(form) })
+    .then(r => r.json())
+    .then(res => {
+      if (res.success) {
+        showToast('Access point updated.');
+        closeEditAPModal();
+        setTimeout(() => location.reload(), 800);
+      } else {
+        showToast(res.error || 'Error updating.', 'error');
+      }
+    });
+}
+
+// ── Delete ────────────────────────────────────────────────────────────────
+function openDeleteAPModal(id, name) {
+  document.getElementById('deleteAPIdField').value          = id;
+  document.getElementById('deleteAPNameDisplay').textContent = name;
+  document.getElementById('deleteAPModal').classList.add('active');
+}
+function closeDeleteAPModal() { document.getElementById('deleteAPModal').classList.remove('active'); }
+
+function confirmDeleteAP() {
+  const id   = document.getElementById('deleteAPIdField').value;
+  const csrf = document.querySelector('#addAPForm [name=csrf_token]').value;
+  const fd   = new FormData();
+  fd.append('csrf_token', csrf);
+
+  fetch(`/access-control/${id}/delete`, { method: 'POST', body: fd })
+    .then(r => r.json())
+    .then(res => {
+      if (res.success) {
+        showToast('Access point deleted.');
+        closeDeleteAPModal();
+        setTimeout(() => location.reload(), 800);
+      } else {
+        showToast(res.error || 'Error deleting.', 'error');
+      }
+    });
+}
+</script>
+{% endblock %}

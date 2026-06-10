@@ -17,3 +17,9 @@ htmlcov/
 dist/
 build/
 *.egg-info/
+# SQLite database
+*.db
+*.sqlite3
+
+# User uploaded photos
+static/uploads/

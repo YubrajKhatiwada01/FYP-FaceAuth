@@ -7,9 +7,9 @@
     <link rel="icon" type="image/png" href="{{ url_for('static', filename='images/final logo.png') }}">
     <link rel="stylesheet" href="{{ url_for('static', filename='css/style.css') }}">
   </head>
-  <body{% if body_class %} class="{{ body_class }}{% if active_page in ['dashboard', 'users', 'access_control', 'logs', 'settings', 'authentication'] %} dashboard-page{% endif %}"{% elif active_page in ['dashboard', 'users', 'access_control', 'logs', 'settings', 'authentication'] %} class="dashboard-page"{% endif %}>
+  <body{% if body_class %} class="{{ body_class }}{% if active_page in ['dashboard', 'users', 'access_control', 'logs', 'settings', 'authentication', 'fingerprint'] %} dashboard-page{% endif %}"{% elif active_page in ['dashboard', 'users', 'access_control', 'logs', 'settings', 'authentication', 'fingerprint'] %} class="dashboard-page"{% endif %}>
     <div class="site-shell">
-      {% set dashboard_pages = ['dashboard', 'users', 'access_control', 'logs', 'settings', 'authentication'] %}
+      {% set dashboard_pages = ['dashboard', 'users', 'access_control', 'logs', 'settings', 'authentication', 'fingerprint'] %}
       {% if active_page not in dashboard_pages %}
       {% block header %}
         <header class="nav-shell">
@@ -137,7 +137,7 @@
               <p>&copy; 2026 FaceAuth. All rights reserved.</p>
             </div>
             <div class="footer-center">
-              <p>Built with 🔐 Security First Approach</p>
+              <p>Built with Security First Approach</p>
             </div>
             <div class="footer-right">
               <a href="#" class="footer-back-to-top">Back to Top ↑</a>

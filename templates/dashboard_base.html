@@ -39,7 +39,15 @@
           <path d="M23 7 L16 12 L23 17 Z"></path>
           <rect x="1" y="5" width="15" height="14" rx="2" ry="2"></rect>
         </svg>
-        <span>Authentication</span>
+        <span>Face Auth</span>
+      </a>
+      <a href="{{ url_for('fingerprint') }}" class="nav-item{{ ' is-active' if active_page == 'fingerprint' else '' }}">
+        <svg width="20" height="20" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2">
+          <path d="M12 22s-8-4.5-8-11.8A8 8 0 0 1 12 2a8 8 0 0 1 8 8.2c0 7.3-8 11.8-8 11.8z"/>
+          <path d="M12 8a2 2 0 1 0 0 4 2 2 0 0 0 0-4z"/>
+          <path d="M12 12v4"/>
+        </svg>
+        <span>Fingerprint</span>
       </a>
       <a href="{{ url_for('access_control') }}" class="nav-item{{ ' is-active' if active_page == 'access_control' else '' }}">
         <svg width="20" height="20" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2">

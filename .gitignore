@@ -1,25 +1,35 @@
-.venv/
+# Python
 __pycache__/
 *.pyc
+*.pyo
+
+# Environment
+.venv/
 .env
 .env.local
-.codex_preview/
-server.*.log
-*.log
-.DS_Store
+
+# IDE / Editor
 .vscode/
 .idea/
+.codex_preview/
 *.swp
 *.swo
 *~
+
+# Logs
+*.log
+server.*.log
+
+# Test / Build artifacts
 .pytest_cache/
 htmlcov/
 dist/
 build/
 *.egg-info/
-# SQLite database
+
+# Database
 *.db
 *.sqlite3
 
-# User uploaded photos
+# Uploads
 static/uploads/

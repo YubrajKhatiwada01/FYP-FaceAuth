@@ -1,0 +1,528 @@
+{% extends "dashboard_base.html" %}
+
+{% block title %}FaceAuth | Fingerprint Authentication{% endblock %}
+{% block dashboard_title %}Fingerprint Authentication{% endblock %}
+{% block dashboard_subtitle %}WebAuthn / FIDO2 biometric enrollment and verification{% endblock %}
+{% block dashboard_notifications_count %}0{% endblock %}
+
+{% block dashboard_content %}
+<div id="toast" class="toast" style="display:none" aria-live="polite"></div>
+
+<!-- ── Top stats strip ──────────────────────────────────────────────── -->
+<div class="fp-stats-strip">
+  <div class="fp-stat-card">
+    <div class="fp-stat-icon">
+      <svg width="22" height="22" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.5">
+        <path d="M12 22s-8-4.5-8-11.8A8 8 0 0 1 12 2a8 8 0 0 1 8 8.2c0 7.3-8 11.8-8 11.8z"/>
+      </svg>
+    </div>
+    <div>
+      <p class="fp-stat-val">{{ enrolled_count }}</p>
+      <p class="fp-stat-lbl">Users Enrolled</p>
+    </div>
+  </div>
+  <div class="fp-stat-card">
+    <div class="fp-stat-icon">
+      <svg width="22" height="22" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.5">
+        <rect x="3" y="11" width="18" height="11" rx="2"/><path d="M7 11V7a5 5 0 0 1 10 0v4"/>
+      </svg>
+    </div>
+    <div>
+      <p class="fp-stat-val">{{ credentials|length }}</p>
+      <p class="fp-stat-lbl">Credentials Stored</p>
+    </div>
+  </div>
+  <div class="fp-stat-card">
+    <div class="fp-stat-icon">
+      <svg width="22" height="22" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.5">
+        <path d="M12 22s8-4 8-10V5l-8-3-8 3v7c0 6 8 10 8 10z"/>
+      </svg>
+    </div>
+    <div>
+      <p class="fp-stat-val" id="statPlatform">—</p>
+      <p class="fp-stat-lbl">Platform Authenticator</p>
+    </div>
+  </div>
+  <div class="fp-stat-card">
+    <div class="fp-stat-icon">
+      <svg width="22" height="22" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.5">
+        <polyline points="22 4 2 4 2 14 22 14 22 4"/><line x1="2" y1="10" x2="22" y2="10"/><circle cx="12" cy="21" r="1"/>
+      </svg>
+    </div>
+    <div>
+      <p class="fp-stat-val" id="statWebAuthn">—</p>
+      <p class="fp-stat-lbl">WebAuthn Support</p>
+    </div>
+  </div>
+</div>
+
+
+<!-- ── Two-panel layout ─────────────────────────────────────────────── -->
+<div class="fp-layout">
+
+  <!-- LEFT — scanner panel + quick auth -->
+  <div class="fp-left">
+
+    <!-- Scanner visualiser -->
+    <div class="fp-scanner-card" id="fpScannerCard">
+      <div class="fp-scanner-glow" id="fpGlow"></div>
+      <div class="fp-scanner-ring fp-ring-1"></div>
+      <div class="fp-scanner-ring fp-ring-2"></div>
+      <div class="fp-scanner-ring fp-ring-3"></div>
+      <div class="fp-scanner-body">
+        <svg class="fp-icon" viewBox="0 0 80 80" fill="none" xmlns="http://www.w3.org/2000/svg" aria-hidden="true">
+          <!-- Fingerprint ridges -->
+          <path d="M40 12 C22 12 10 24 10 40 C10 56 22 68 40 68 C58 68 70 56 70 40 C70 24 58 12 40 12Z" stroke="currentColor" stroke-width="2" fill="none" stroke-dasharray="8 4"/>
+          <path d="M40 20 C26 20 16 29 16 40 C16 51 26 60 40 60 C54 60 64 51 64 40 C64 29 54 20 40 20Z" stroke="currentColor" stroke-width="2" fill="none" stroke-dasharray="7 4"/>
+          <path d="M40 28 C30 28 22 33 22 40 C22 47 30 52 40 52 C50 52 58 47 58 40 C58 33 50 28 40 28Z" stroke="currentColor" stroke-width="2" fill="none" stroke-dasharray="6 4"/>
+          <path d="M40 36 C35 36 30 37.5 30 40 C30 42.5 35 44 40 44 C45 44 50 42.5 50 40 C50 37.5 45 36 40 36Z" stroke="currentColor" stroke-width="2.5" fill="none"/>
+          <!-- Scan line -->
+          <line class="fp-scan-line-svg" x1="10" y1="40" x2="70" y2="40" stroke="rgba(21,213,238,0.6)" stroke-width="1.5" stroke-dasharray="4 3"/>
+        </svg>
+        <!-- Scan sweep -->
+        <div class="fp-sweep" id="fpSweep" style="display:none"></div>
+      </div>
+      <p class="fp-scanner-label" id="fpScannerLabel">Place finger on sensor</p>
+      <p class="fp-scanner-sub" id="fpScannerSub">Your device's built-in fingerprint reader</p>
+    </div>
+
+    <!-- Quick verify card -->
+    <div class="auth-card">
+      <h3 class="auth-card-title">
+        <svg width="17" height="17" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2">
+          <path d="M12 22s8-4 8-10V5l-8-3-8 3v7c0 6 8 10 8 10z"/>
+        </svg>
+        Quick Verify
+      </h3>
+
+      <div class="form-group">
+        <label class="form-label">Select User</label>
+        <select id="verifyUserSelect" class="form-select">
+          <option value="">— Any enrolled user —</option>
+          {% for user in all_users %}
+            {% set user_creds = credentials | selectattr('user_id', 'equalto', user.id) | list %}
+            {% if user_creds %}
+            <option value="{{ user.id }}">{{ user.full_name }} (@{{ user.username }})</option>
+            {% endif %}
+          {% endfor %}
+        </select>
+      </div>
+
+      <button class="btn btn-primary fp-auth-btn" id="btnVerify" onclick="startVerify()">
+        <svg width="18" height="18" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2">
+          <path d="M12 22s-8-4.5-8-11.8A8 8 0 0 1 12 2a8 8 0 0 1 8 8.2c0 7.3-8 11.8-8 11.8z"/>
+          <path d="M12 8a2 2 0 1 0 0 4 2 2 0 0 0 0-4z"/>
+        </svg>
+        Verify Fingerprint
+      </button>
+
+      <!-- Result -->
+      <div class="auth-result" id="verifyResult" style="display:none">
+        <div class="result-icon" id="verifyResultIcon"></div>
+        <div class="result-body">
+          <p class="result-status" id="verifyResultStatus"></p>
+          <p class="result-detail" id="verifyResultDetail"></p>
+        </div>
+      </div>
+    </div>
+
+  </div><!-- /fp-left -->
+
+
+  <!-- RIGHT — enroll + table -->
+  <div class="fp-right">
+
+    <!-- Enrollment card -->
+    <div class="auth-card">
+      <h3 class="auth-card-title">
+        <svg width="17" height="17" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2">
+          <line x1="12" y1="5" x2="12" y2="19"/><line x1="5" y1="12" x2="19" y2="12"/>
+        </svg>
+        Enroll New Fingerprint
+      </h3>
+
+      <div class="form-grid-2" style="margin-bottom:0">
+        <div class="form-group">
+          <label class="form-label">User <span class="required">*</span></label>
+          <select id="enrollUserSelect" class="form-select">
+            <option value="">— Select user —</option>
+            {% for user in all_users %}
+            {% if user.status == 'Active' %}
+            <option value="{{ user.id }}">{{ user.full_name }} (@{{ user.username }})</option>
+            {% endif %}
+            {% endfor %}
+          </select>
+        </div>
+        <div class="form-group">
+          <label class="form-label">Device Label</label>
+          <input type="text" id="enrollDeviceName" class="form-input"
+                 placeholder="e.g. Built-in fingerprint sensor" value="Fingerprint Sensor">
+        </div>
+      </div>
+
+      <button class="btn btn-primary" id="btnEnroll" onclick="startEnroll()" style="width:100%;margin-top:8px">
+        <svg width="17" height="17" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2">
+          <path d="M12 22s-8-4.5-8-11.8A8 8 0 0 1 12 2a8 8 0 0 1 8 8.2c0 7.3-8 11.8-8 11.8z"/>
+          <path d="M9 12l2 2 4-4"/>
+        </svg>
+        Enroll Fingerprint
+      </button>
+
+      <p class="fp-enroll-hint">
+        The browser will invoke your device's fingerprint sensor via Windows Hello / Touch ID.
+        The OS never sends raw fingerprint data — only a signed cryptographic proof.
+      </p>
+    </div>
+
+    <!-- Enrolled credentials table -->
+    <div class="auth-card" style="padding:0;overflow:hidden">
+      <div style="padding:18px 20px 14px;border-bottom:1px solid var(--line);display:flex;align-items:center;justify-content:space-between">
+        <h3 class="auth-card-title" style="margin:0">
+          <svg width="17" height="17" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2">
+            <ellipse cx="12" cy="5" rx="9" ry="3"/><path d="M21 12c0 1.66-4 3-9 3s-9-1.34-9-3"/>
+            <path d="M3 5v14c0 1.66 4 3 9 3s9-1.34 9-3V5"/>
+          </svg>
+          Enrolled Credentials
+        </h3>
+        <span style="font-family:var(--mono);font-size:.75rem;color:var(--dim)">{{ credentials|length }} total</span>
+      </div>
+
+      <div class="table-wrapper" style="border:none;border-radius:0">
+        <table class="users-data-table" id="credTable">
+          <thead>
+            <tr>
+              <th>User</th>
+              <th>Device Label</th>
+              <th>Sign Count</th>
+              <th>Enrolled</th>
+              <th style="width:60px">Remove</th>
+            </tr>
+          </thead>
+          <tbody id="credTableBody">
+            {% for cred in credentials %}
+            <tr id="cred-{{ cred.credential_id[:16] }}">
+              <td>
+                <div style="display:flex;flex-direction:column;gap:2px">
+                  <span style="font-weight:600;color:var(--text)">{{ cred.full_name }}</span>
+                  <span class="mono-text">@{{ cred.username }}</span>
+                </div>
+              </td>
+              <td>
+                <div style="display:flex;align-items:center;gap:8px">
+                  <svg width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" style="color:var(--cyan);flex-shrink:0">
+                    <path d="M12 22s-8-4.5-8-11.8A8 8 0 0 1 12 2a8 8 0 0 1 8 8.2c0 7.3-8 11.8-8 11.8z"/>
+                  </svg>
+                  {{ cred.device_name }}
+                </div>
+              </td>
+              <td class="mono-text">{{ cred.sign_count }}</td>
+              <td class="dim-text">{{ cred.registered_at[:10] if cred.registered_at else '—' }}</td>
+              <td>
+                <button class="action-btn delete" title="Remove credential"
+                  onclick="removeCredential('{{ cred.credential_id }}', '{{ cred.full_name|e }}')">
+                  <svg width="15" height="15" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2">
+                    <polyline points="3 6 5 6 21 6"/>
+                    <path d="M19 6v14a2 2 0 0 1-2 2H7a2 2 0 0 1-2-2V6m3 0V4a2 2 0 0 1 2-2h4a2 2 0 0 1 2 2v2"/>
+                  </svg>
+                </button>
+              </td>
+            </tr>
+            {% else %}
+            <tr id="noCredRow">
+              <td colspan="5" class="empty-state">No fingerprints enrolled yet.</td>
+            </tr>
+            {% endfor %}
+          </tbody>
+        </table>
+      </div>
+    </div>
+
+  </div><!-- /fp-right -->
+</div><!-- /fp-layout -->
+
+
+<!-- ══════════════════════════════════════════════════════════
+     DELETE CONFIRMATION MODAL
+     ══════════════════════════════════════════════════════════ -->
+<div class="modal" id="deleteFpModal" role="dialog" aria-modal="true">
+  <div class="modal-content">
+    <div class="modal-header">
+      <h2>Remove Credential</h2>
+      <button class="modal-close" onclick="closeDeleteFpModal()" aria-label="Close">&times;</button>
+    </div>
+    <div class="modal-body">
+      <div class="confirmation-message">
+        <strong>Warning!</strong> This removes the fingerprint credential permanently.
+        The user will not be able to authenticate with this device until re-enrolled.
+      </div>
+      <p style="margin:14px 0 10px;color:var(--text)">Remove credential for:</p>
+      <div style="background:var(--panel-strong);padding:14px;border-radius:8px;border:1px solid var(--line);font-weight:600;color:var(--text)" id="deleteFpName"></div>
+      <input type="hidden" id="deleteFpCredId">
+    </div>
+    <div class="modal-footer">
+      <button class="btn btn-secondary" onclick="closeDeleteFpModal()">Cancel</button>
+      <button class="btn btn-danger" onclick="confirmRemoveCredential()">Remove</button>
+    </div>
+  </div>
+</div>
+
+
+<!-- ══════════════════════════════════════════════════════════
+     JAVASCRIPT
+     ══════════════════════════════════════════════════════════ -->
+<script>
+/* ── Capability detection ───────────────────────────────────────────── */
+window.addEventListener('DOMContentLoaded', async () => {
+  const webAuthnOk = !!(window.PublicKeyCredential);
+  document.getElementById('statWebAuthn').textContent = webAuthnOk ? 'Supported' : 'Not Supported';
+
+  if (webAuthnOk) {
+    try {
+      const available = await PublicKeyCredential.isUserVerifyingPlatformAuthenticatorAvailable();
+      document.getElementById('statPlatform').textContent = available ? 'Available' : 'None detected';
+      if (!available) showUnsupportedWarning();
+    } catch (_) {
+      document.getElementById('statPlatform').textContent = 'Unknown';
+    }
+  } else {
+    showUnsupportedWarning();
+  }
+});
+
+function showUnsupportedWarning() {
+  const btn = document.getElementById('btnEnroll');
+  if (btn) btn.disabled = true;
+  const vbtn = document.getElementById('btnVerify');
+  if (vbtn) vbtn.disabled = true;
+  showToast('No platform authenticator found. Enable Windows Hello or a fingerprint sensor.', 'error');
+}
+
+/* ── Toast ──────────────────────────────────────────────────────────── */
+function showToast(msg, type = 'success') {
+  const t = document.getElementById('toast');
+  t.textContent = msg;
+  t.className   = 'toast toast-' + type;
+  t.style.display = 'block';
+  setTimeout(() => { t.style.display = 'none'; }, 4000);
+}
+
+/* ── Scanner animation helpers ──────────────────────────────────────── */
+function setScannerState(state) {
+  const card  = document.getElementById('fpScannerCard');
+  const glow  = document.getElementById('fpGlow');
+  const sweep = document.getElementById('fpSweep');
+  const label = document.getElementById('fpScannerLabel');
+  const sub   = document.getElementById('fpScannerSub');
+
+  card.className = 'fp-scanner-card fp-state-' + state;
+  sweep.style.display = (state === 'scanning') ? 'block' : 'none';
+
+  const states = {
+    idle:     { label: 'Place finger on sensor',       sub: 'Your device\'s built-in fingerprint reader' },
+    scanning: { label: 'Scanning…',                    sub: 'Keep your finger steady on the sensor'      },
+    granted:  { label: 'Fingerprint Verified',         sub: 'Access granted successfully'                },
+    denied:   { label: 'Fingerprint Not Recognised',   sub: 'Try again or contact an administrator'      },
+    enrolled: { label: 'Fingerprint Enrolled',         sub: 'Credential saved to the database'           },
+  };
+  const s = states[state] || states.idle;
+  label.textContent = s.label;
+  sub.textContent   = s.sub;
+}
+
+/* ── Base64url helpers ──────────────────────────────────────────────── */
+function b64uDecode(str) {
+  str = str.replace(/-/g, '+').replace(/_/g, '/');
+  while (str.length % 4) str += '=';
+  return Uint8Array.from(atob(str), c => c.charCodeAt(0));
+}
+
+function b64uEncode(buf) {
+  return btoa(String.fromCharCode(...new Uint8Array(buf)))
+    .replace(/\+/g, '-').replace(/\//g, '_').replace(/=+$/, '');
+}
+
+function getCSRF() {
+  return document.querySelector('meta[name="csrf-token"]')?.content
+    || '{{ csrf_token() }}';
+}
+
+/* ══════════════════════════════════════════════════════════════════════
+   ENROLLMENT
+   ══════════════════════════════════════════════════════════════════════ */
+async function startEnroll() {
+  const userId     = document.getElementById('enrollUserSelect').value;
+  const deviceName = document.getElementById('enrollDeviceName').value.trim() || 'Fingerprint Sensor';
+
+  if (!userId) { showToast('Please select a user to enroll.', 'error'); return; }
+
+  setScannerState('scanning');
+  document.getElementById('btnEnroll').disabled = true;
+
+  try {
+    // 1. Get challenge from server
+    const beginRes = await fetch('/fingerprint/register/begin', {
+      method:  'POST',
+      headers: { 'Content-Type': 'application/json', 'X-CSRFToken': getCSRF() },
+      body:    JSON.stringify({ user_id: userId }),
+    });
+    const options = await beginRes.json();
+    if (options.error) throw new Error(options.error);
+
+    // 2. Decode server options for navigator.credentials.create
+    options.challenge = b64uDecode(options.challenge);
+    options.user.id   = b64uDecode(options.user.id);
+    if (options.excludeCredentials) {
+      options.excludeCredentials = options.excludeCredentials.map(c => ({
+        ...c, id: b64uDecode(c.id)
+      }));
+    }
+
+    // 3. Invoke platform authenticator (Windows Hello / fingerprint)
+    const credential = await navigator.credentials.create({ publicKey: options });
+
+    // 4. Encode response for the server
+    const payload = {
+      device_name:  deviceName,
+      id:           credential.id,
+      rawId:        b64uEncode(credential.rawId),
+      type:         credential.type,
+      response: {
+        attestationObject: b64uEncode(credential.response.attestationObject),
+        clientDataJSON:    b64uEncode(credential.response.clientDataJSON),
+        transports:        credential.response.getTransports
+                             ? credential.response.getTransports()
+                             : [],
+      },
+    };
+
+    // 5. Verify on server
+    const completeRes = await fetch('/fingerprint/register/complete', {
+      method:  'POST',
+      headers: { 'Content-Type': 'application/json', 'X-CSRFToken': getCSRF() },
+      body:    JSON.stringify(payload),
+    });
+    const result = await completeRes.json();
+    if (!result.success) throw new Error(result.error);
+
+    setScannerState('enrolled');
+    showToast('Fingerprint enrolled successfully!');
+    setTimeout(() => location.reload(), 1200);
+
+  } catch (err) {
+    setScannerState('denied');
+    showToast(err.message || 'Enrollment failed.', 'error');
+  } finally {
+    document.getElementById('btnEnroll').disabled = false;
+  }
+}
+
+/* ══════════════════════════════════════════════════════════════════════
+   VERIFICATION
+   ══════════════════════════════════════════════════════════════════════ */
+async function startVerify() {
+  const userId = document.getElementById('verifyUserSelect').value || null;
+  setScannerState('scanning');
+  document.getElementById('btnVerify').disabled = true;
+  document.getElementById('verifyResult').style.display = 'none';
+
+  try {
+    // 1. Get challenge
+    const beginRes = await fetch('/fingerprint/auth/begin', {
+      method:  'POST',
+      headers: { 'Content-Type': 'application/json', 'X-CSRFToken': getCSRF() },
+      body:    JSON.stringify({ user_id: userId }),
+    });
+    const options = await beginRes.json();
+    if (options.error) throw new Error(options.error);
+
+    options.challenge = b64uDecode(options.challenge);
+    if (options.allowCredentials) {
+      options.allowCredentials = options.allowCredentials.map(c => ({
+        ...c, id: b64uDecode(c.id)
+      }));
+    }
+
+    // 2. Invoke platform authenticator
+    const assertion = await navigator.credentials.get({ publicKey: options });
+
+    // 3. Encode and send to server
+    const payload = {
+      id:     assertion.id,
+      rawId:  b64uEncode(assertion.rawId),
+      type:   assertion.type,
+      response: {
+        authenticatorData: b64uEncode(assertion.response.authenticatorData),
+        clientDataJSON:    b64uEncode(assertion.response.clientDataJSON),
+        signature:         b64uEncode(assertion.response.signature),
+        userHandle:        assertion.response.userHandle
+                             ? b64uEncode(assertion.response.userHandle)
+                             : null,
+      },
+    };
+
+    const completeRes = await fetch('/fingerprint/auth/complete', {
+      method:  'POST',
+      headers: { 'Content-Type': 'application/json', 'X-CSRFToken': getCSRF() },
+      body:    JSON.stringify(payload),
+    });
+    const result = await completeRes.json();
+    if (!result.success) throw new Error(result.error);
+
+    setScannerState('granted');
+    showVerifyResult('granted', `Access Granted — ${result.full_name}`,
+      `@${result.username} · Verified by fingerprint`);
+
+  } catch (err) {
+    setScannerState('denied');
+    showVerifyResult('denied', 'Access Denied', err.message || 'Fingerprint not recognised.');
+  } finally {
+    document.getElementById('btnVerify').disabled = false;
+    setTimeout(() => setScannerState('idle'), 4000);
+  }
+}
+
+function showVerifyResult(type, status, detail) {
+  const box  = document.getElementById('verifyResult');
+  const icon = document.getElementById('verifyResultIcon');
+  const sEl  = document.getElementById('verifyResultStatus');
+  const dEl  = document.getElementById('verifyResultDetail');
+  box.style.display = 'flex';
+  box.className = 'auth-result result-' + type;
+  sEl.textContent = status;
+  dEl.textContent = detail;
+  icon.innerHTML = type === 'granted'
+    ? '<svg width="28" height="28" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.5"><polyline points="20 6 9 17 4 12"></polyline></svg>'
+    : '<svg width="28" height="28" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.5"><line x1="18" y1="6" x2="6" y2="18"></line><line x1="6" y1="6" x2="18" y2="18"></line></svg>';
+}
+
+/* ══════════════════════════════════════════════════════════════════════
+   DELETE CREDENTIAL
+   ══════════════════════════════════════════════════════════════════════ */
+function removeCredential(credId, userName) {
+  document.getElementById('deleteFpCredId').value   = credId;
+  document.getElementById('deleteFpName').textContent = userName;
+  document.getElementById('deleteFpModal').classList.add('active');
+}
+
+function closeDeleteFpModal() {
+  document.getElementById('deleteFpModal').classList.remove('active');
+}
+
+async function confirmRemoveCredential() {
+  const credId = document.getElementById('deleteFpCredId').value;
+  const res = await fetch(`/fingerprint/credential/${encodeURIComponent(credId)}/delete`, {
+    method: 'POST',
+    headers: { 'Content-Type': 'application/json', 'X-CSRFToken': getCSRF() },
+    body: JSON.stringify({}),
+  });
+  const data = await res.json();
+  if (data.success) {
+    showToast('Credential removed.');
+    closeDeleteFpModal();
+    setTimeout(() => location.reload(), 700);
+  } else {
+    showToast(data.error || 'Error removing credential.', 'error');
+  }
+}
+</script>
+{% endblock %}

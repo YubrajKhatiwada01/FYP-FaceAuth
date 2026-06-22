@@ -1,0 +1,27 @@
+{
+  "pythonVersion": "3.13",
+  "pythonPlatform": "Windows",
+  "venvPath": ".",
+  "extraPaths": [
+    "C:/Python313/Lib/site-packages",
+    "C:/Users/acer/AppData/Roaming/Python/Python313/site-packages"
+  ],
+  "typeCheckingMode": "basic",
+  "reportMissingImports": false,
+  "reportMissingModuleSource": false,
+  "reportAttributeAccessIssue": false,
+  "reportUnknownMemberType": false,
+  "reportUnknownVariableType": false,
+  "reportUnknownArgumentType": false,
+  "reportGeneralTypeIssues": false,
+  "include": [
+    "app.py",
+    "database.py",
+    "config.py"
+  ],
+  "exclude": [
+    "**/__pycache__",
+    "**/*.pyc",
+    ".git"
+  ]
+}

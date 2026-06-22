@@ -5080,3 +5080,240 @@ body.dashboard-page {
 .auth-log-feed::-webkit-scrollbar { width: 4px; }
 .auth-log-feed::-webkit-scrollbar-track { background: transparent; }
 .auth-log-feed::-webkit-scrollbar-thumb { background: var(--line); border-radius: 2px; }
+
+/* =====================================================================
+   FINGERPRINT / WEBAUTHN PAGE
+   ===================================================================== */
+
+/* Stats strip */
+.fp-stats-strip {
+  display: grid;
+  grid-template-columns: repeat(4, 1fr);
+  gap: 16px;
+  margin-bottom: 28px;
+}
+
+.fp-stat-card {
+  display: flex;
+  align-items: center;
+  gap: 14px;
+  padding: 18px 20px;
+  border: 1px solid var(--line);
+  border-radius: 12px;
+  background: var(--panel);
+}
+
+.fp-stat-icon {
+  display: flex; align-items: center; justify-content: center;
+  width: 44px; height: 44px; flex-shrink: 0;
+  border: 1px solid rgba(21,213,238,0.2);
+  border-radius: 10px;
+  background: rgba(21,213,238,0.07);
+  color: var(--cyan-soft);
+}
+
+.fp-stat-val {
+  margin: 0 0 2px;
+  font-size: 1.5rem;
+  font-weight: 800;
+  font-family: var(--mono);
+  color: var(--cyan-soft);
+  line-height: 1;
+}
+
+.fp-stat-lbl {
+  margin: 0;
+  font-size: 0.73rem;
+  font-family: var(--mono);
+  color: var(--dim);
+  text-transform: uppercase;
+  letter-spacing: 0.07em;
+}
+
+/* Two-column layout */
+.fp-layout {
+  display: grid;
+  grid-template-columns: 320px 1fr;
+  gap: 24px;
+  align-items: start;
+}
+
+.fp-left, .fp-right {
+  display: flex;
+  flex-direction: column;
+  gap: 20px;
+}
+
+/* ── Fingerprint scanner card ───────────────────────────────────────── */
+.fp-scanner-card {
+  position: relative;
+  display: flex;
+  flex-direction: column;
+  align-items: center;
+  justify-content: center;
+  padding: 36px 24px 28px;
+  border: 1px solid var(--line);
+  border-radius: 16px;
+  background: var(--panel);
+  overflow: hidden;
+  transition: border-color 400ms, box-shadow 400ms;
+  text-align: center;
+  min-height: 280px;
+}
+
+/* State variants */
+.fp-state-scanning {
+  border-color: rgba(21,213,238,0.4);
+  box-shadow: 0 0 40px rgba(21,213,238,0.1);
+}
+
+.fp-state-granted {
+  border-color: rgba(57,232,143,0.5);
+  box-shadow: 0 0 40px rgba(57,232,143,0.12);
+}
+
+.fp-state-denied {
+  border-color: rgba(255,107,107,0.5);
+  box-shadow: 0 0 40px rgba(255,107,107,0.12);
+}
+
+.fp-state-enrolled {
+  border-color: rgba(21,213,238,0.5);
+  box-shadow: 0 0 40px rgba(21,213,238,0.14);
+}
+
+/* Glow pulse behind icon */
+.fp-scanner-glow {
+  position: absolute;
+  width: 200px; height: 200px;
+  border-radius: 50%;
+  top: 50%; left: 50%;
+  transform: translate(-50%, -55%);
+  pointer-events: none;
+  transition: background 400ms;
+}
+
+.fp-state-idle     .fp-scanner-glow { background: radial-gradient(circle, rgba(21,213,238,0.06) 0%, transparent 70%); }
+.fp-state-scanning .fp-scanner-glow { background: radial-gradient(circle, rgba(21,213,238,0.18) 0%, transparent 65%); animation: glowPulse 1.2s ease-in-out infinite; }
+.fp-state-granted  .fp-scanner-glow { background: radial-gradient(circle, rgba(57,232,143,0.18) 0%, transparent 65%); }
+.fp-state-denied   .fp-scanner-glow { background: radial-gradient(circle, rgba(255,107,107,0.18) 0%, transparent 65%); }
+.fp-state-enrolled .fp-scanner-glow { background: radial-gradient(circle, rgba(21,213,238,0.2) 0%, transparent 65%); }
+
+@keyframes glowPulse {
+  0%,100% { opacity: 0.6; transform: translate(-50%,-55%) scale(1); }
+  50%      { opacity: 1;   transform: translate(-50%,-55%) scale(1.15); }
+}
+
+/* Pulsing rings */
+.fp-scanner-ring {
+  position: absolute;
+  border-radius: 50%;
+  border: 1px solid rgba(21,213,238,0.12);
+  top: 50%; left: 50%;
+  transform: translate(-50%, -55%);
+  pointer-events: none;
+}
+
+.fp-ring-1 { width: 160px; height: 160px; animation: ringExpand 3s ease-out infinite; }
+.fp-ring-2 { width: 200px; height: 200px; animation: ringExpand 3s ease-out infinite 1s; }
+.fp-ring-3 { width: 240px; height: 240px; animation: ringExpand 3s ease-out infinite 2s; }
+
+@keyframes ringExpand {
+  0%   { opacity: 0.5; transform: translate(-50%,-55%) scale(0.8); }
+  100% { opacity: 0;   transform: translate(-50%,-55%) scale(1.3); }
+}
+
+.fp-state-scanning .fp-scanner-ring { border-color: rgba(21,213,238,0.25); }
+.fp-state-granted  .fp-scanner-ring { border-color: rgba(57,232,143,0.25); }
+.fp-state-denied   .fp-scanner-ring { border-color: rgba(255,107,107,0.2); animation: none; }
+
+/* Icon body */
+.fp-scanner-body {
+  position: relative;
+  z-index: 2;
+  margin-bottom: 20px;
+}
+
+.fp-icon {
+  width: 80px; height: 80px;
+  color: var(--cyan-soft);
+  transition: color 400ms;
+  display: block;
+}
+
+.fp-state-granted .fp-icon  { color: #39e88f; }
+.fp-state-denied  .fp-icon  { color: #ff6b6b; }
+.fp-state-scanning .fp-icon { animation: fpPulse 0.8s ease-in-out infinite; }
+
+@keyframes fpPulse {
+  0%,100% { opacity: 0.7; }
+  50%      { opacity: 1; }
+}
+
+/* Scan sweep line */
+.fp-sweep {
+  position: absolute;
+  left: 0; right: 0;
+  height: 2px;
+  background: linear-gradient(90deg, transparent, rgba(21,213,238,0.9), transparent);
+  box-shadow: 0 0 10px rgba(21,213,238,0.6);
+  animation: fpSweep 1.4s ease-in-out infinite;
+  pointer-events: none;
+}
+
+@keyframes fpSweep {
+  0%   { top: 5%;  opacity: 0; }
+  10%  { opacity: 1; }
+  90%  { opacity: 1; }
+  100% { top: 95%; opacity: 0; }
+}
+
+.fp-scanner-label {
+  position: relative; z-index: 2;
+  margin: 0 0 6px;
+  font-size: 1rem;
+  font-weight: 700;
+  color: var(--text);
+  transition: color 300ms;
+}
+
+.fp-state-granted .fp-scanner-label { color: #39e88f; }
+.fp-state-denied  .fp-scanner-label { color: #ff6b6b; }
+
+.fp-scanner-sub {
+  position: relative; z-index: 2;
+  margin: 0;
+  font-size: 0.8rem;
+  color: var(--dim);
+  font-family: var(--mono);
+}
+
+/* Auth button */
+.fp-auth-btn { width: 100%; margin-top: 4px; height: 48px; }
+
+/* Enroll hint */
+.fp-enroll-hint {
+  margin: 14px 0 0;
+  padding: 12px 14px;
+  border: 1px solid rgba(21,213,238,0.12);
+  border-radius: 8px;
+  background: rgba(21,213,238,0.04);
+  font-size: 0.8rem;
+  color: var(--dim);
+  line-height: 1.55;
+  font-family: var(--mono);
+}
+
+/* Responsive */
+@media (max-width: 1100px) {
+  .fp-stats-strip { grid-template-columns: repeat(2, 1fr); }
+  .fp-layout      { grid-template-columns: 1fr; }
+}
+
+@media (max-width: 600px) {
+  .fp-stats-strip { grid-template-columns: 1fr 1fr; }
+}
+
+@media (max-width: 400px) {
+  .fp-stats-strip { grid-template-columns: 1fr; }
+}

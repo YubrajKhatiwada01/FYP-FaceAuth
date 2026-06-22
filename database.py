@@ -3,9 +3,10 @@ database.py — SQLite database layer for FaceAuth.
 
 Tables
 ------
-users         : system operator accounts (login credentials + profile photo)
-logs          : immutable audit trail for all system events
-access_points : physical / logical entry points managed by the system
+users               : system operator accounts (login credentials + profile photo)
+logs                : immutable audit trail for all system events
+access_points       : physical / logical entry points managed by the system
+webauthn_credentials: WebAuthn public-key credentials (fingerprint / Windows Hello)
 """
 
 import sqlite3
@@ -80,6 +81,26 @@ def init_db():
             success_rate  REAL    NOT NULL DEFAULT 100.0,
             last_used     TEXT,
             created_at    TEXT    NOT NULL DEFAULT (datetime('now'))
+        )
+    """)
+
+    # -- webauthn_credentials -------------------------------------------------
+    # Stores one or more FIDO2/WebAuthn public-key credentials per user.
+    # credential_id   : base64url-encoded credential ID returned by the authenticator
+    # public_key      : CBOR-encoded COSE public key (stored as hex)
+    # sign_count      : monotonic counter — updated on every successful assertion
+    # transports      : JSON array of transport hints ("internal", "usb", etc.)
+    # registered_at   : when the credential was created
+    cur.execute("""
+        CREATE TABLE IF NOT EXISTS webauthn_credentials (
+            id              INTEGER PRIMARY KEY AUTOINCREMENT,
+            user_id         INTEGER NOT NULL REFERENCES users(id) ON DELETE CASCADE,
+            credential_id   TEXT    NOT NULL UNIQUE,
+            public_key      TEXT    NOT NULL,
+            sign_count      INTEGER NOT NULL DEFAULT 0,
+            device_name     TEXT    NOT NULL DEFAULT 'Fingerprint Sensor',
+            transports      TEXT,
+            registered_at   TEXT    NOT NULL DEFAULT (datetime('now'))
         )
     """)
 
@@ -352,6 +373,96 @@ def count_active_access_points():
     conn  = get_db()
     count = conn.execute(
         "SELECT COUNT(*) FROM access_points WHERE status='Active'"
+    ).fetchone()[0]
+    conn.close()
+    return count
+
+
+# ---------------------------------------------------------------------------
+# WebAuthn / Fingerprint credential queries
+# ---------------------------------------------------------------------------
+
+def save_webauthn_credential(user_id, credential_id, public_key,
+                              device_name="Fingerprint Sensor", transports=None):
+    """Persist a newly registered WebAuthn credential."""
+    conn = get_db()
+    try:
+        conn.execute(
+            """INSERT INTO webauthn_credentials
+               (user_id, credential_id, public_key, device_name, transports)
+               VALUES (?,?,?,?,?)""",
+            (user_id, credential_id, public_key, device_name,
+             transports or "[]"),
+        )
+        conn.commit()
+        return True
+    except sqlite3.IntegrityError:
+        return False          # duplicate credential_id
+    finally:
+        conn.close()
+
+
+def get_webauthn_credential(credential_id):
+    """Return a single credential row by its credential_id."""
+    conn = get_db()
+    row  = conn.execute(
+        "SELECT * FROM webauthn_credentials WHERE credential_id = ?",
+        (credential_id,),
+    ).fetchone()
+    conn.close()
+    return row
+
+
+def get_webauthn_credentials_for_user(user_id):
+    """Return all registered credentials for a user."""
+    conn = get_db()
+    rows = conn.execute(
+        "SELECT * FROM webauthn_credentials WHERE user_id = ? ORDER BY registered_at DESC",
+        (user_id,),
+    ).fetchall()
+    conn.close()
+    return rows
+
+
+def get_all_webauthn_credentials():
+    """Return all credentials joined with user info — for the admin overview table."""
+    conn = get_db()
+    rows = conn.execute(
+        """SELECT wc.*, u.full_name, u.username, u.status AS user_status
+           FROM webauthn_credentials wc
+           JOIN users u ON u.id = wc.user_id
+           ORDER BY wc.registered_at DESC""",
+    ).fetchall()
+    conn.close()
+    return rows
+
+
+def update_webauthn_sign_count(credential_id, new_count):
+    """Increment the sign counter after a successful assertion."""
+    conn = get_db()
+    conn.execute(
+        "UPDATE webauthn_credentials SET sign_count = ? WHERE credential_id = ?",
+        (new_count, credential_id),
+    )
+    conn.commit()
+    conn.close()
+
+
+def delete_webauthn_credential(credential_id):
+    conn = get_db()
+    conn.execute(
+        "DELETE FROM webauthn_credentials WHERE credential_id = ?",
+        (credential_id,),
+    )
+    conn.commit()
+    conn.close()
+
+
+def count_webauthn_enrolled():
+    """Number of users who have at least one registered credential."""
+    conn   = get_db()
+    count  = conn.execute(
+        "SELECT COUNT(DISTINCT user_id) FROM webauthn_credentials"
     ).fetchone()[0]
     conn.close()
     return count

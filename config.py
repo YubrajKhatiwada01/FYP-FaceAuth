@@ -5,7 +5,7 @@ class Config:
     """Base configuration"""
     SECRET_KEY = os.environ.get('SECRET_KEY') or 'dev-secret-key-change-in-production'
     FLASK_ENV = os.environ.get('FLASK_ENV', 'development')
-    DEBUG = os.environ.get('DEBUG', True)
+    DEBUG = os.environ.get('DEBUG', 'True').lower() in ('true', '1', 'yes')
     
     # Session configuration
     PERMANENT_SESSION_LIFETIME = timedelta(hours=24)

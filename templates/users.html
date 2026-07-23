@@ -39,7 +39,15 @@
         <th>Role</th>
         <th>Status</th>
         <th>Joined</th>
-        <th style="width:100px">Actions</th>
+        <th>
+          <span style="display:inline-flex;align-items:center;gap:.3rem">
+            <svg width="13" height="13" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2">
+              <polyline points="6.5 6.5 17.5 17.5 12 23 12 1 17.5 6.5 6.5 17.5"></polyline>
+            </svg>
+            BT MAC
+          </span>
+        </th>
+        <th style="width:120px">Actions</th>
       </tr>
     </thead>
     <tbody id="usersTableBody">
@@ -49,8 +57,15 @@
         <!-- Photo cell -->
         <td>
           {% if user.photo_path %}
-          <img src="{{ url_for('uploaded_file', filename=user.photo_path) }}" alt="{{ user.full_name }}"
-            class="user-photo-thumb">
+          <div style="position:relative;display:inline-block">
+            <img src="{{ url_for('uploaded_file', filename=user.photo_path) }}" alt="{{ user.full_name }}"
+              class="user-photo-thumb">
+            {% if user.photos %}
+            <span class="samples-badge" style="position:absolute;bottom:-4px;right:-4px;background:linear-gradient(135deg,#06b6d4,#2563eb);color:#fff;font-size:0.62rem;font-weight:700;padding:2px 5px;border-radius:4px;line-height:1;box-shadow:0 2px 4px rgba(0,0,0,0.5)">
+              {{ user.photos|length }}
+            </span>
+            {% endif %}
+          </div>
           {% else %}
           <div class="user-avatar-fallback">{{ user.full_name[0]|upper }}</div>
           {% endif %}
@@ -71,6 +86,15 @@
           </span>
         </td>
         <td class="dim-text">{{ user.created_at[:10] if user.created_at else '—' }}</td>
+        <!-- BT MAC cell -->
+        <td id="btMacCell-{{ user.id }}">
+          {% if user.bluetooth_mac %}
+          <code style="font-size:.72rem;color:#06b6d4;letter-spacing:.03em">{{ user.bluetooth_mac }}</code>
+          {% else %}
+          <span style="color:#475569;font-size:.75rem;font-style:italic">Not set</span>
+          {% endif %}
+        </td>
+
         <td>
           <div class="action-buttons">
             <button class="action-btn" title="Edit user"
@@ -82,10 +106,21 @@
               data-role="{{ user.role }}"
               data-status="{{ user.status }}"
               data-photo="{{ user.photo_path or '' }}"
+              data-photos="{{ user.photos|tojson|safe if user.photos else '[]' }}"
               onclick="openEditUserModalFromBtn(this)">
               <svg width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2">
                 <path d="M11 4H4a2 2 0 0 0-2 2v14a2 2 0 0 0 2 2h14a2 2 0 0 0 2-2v-7"></path>
                 <path d="M18.5 2.5a2.121 2.121 0 0 1 3 3L12 15l-4 1 1-4 9.5-9.5z"></path>
+              </svg>
+            </button>
+            <button class="action-btn" title="Set Bluetooth MAC"
+              style="color:#06b6d4;border-color:rgba(6,182,212,.3)"
+              data-id="{{ user.id }}"
+              data-fullname="{{ user.full_name }}"
+              data-mac="{{ user.bluetooth_mac or '' }}"
+              onclick="openBtMacModal(this)">
+              <svg width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2">
+                <polyline points="6.5 6.5 17.5 17.5 12 23 12 1 17.5 6.5 6.5 17.5"></polyline>
               </svg>
             </button>
             <button class="action-btn delete" title="Delete user"
@@ -103,7 +138,7 @@
       </tr>
       {% else %}
       <tr id="emptyRow">
-        <td colspan="9" class="empty-state">No users found.</td>
+        <td colspan="10" class="empty-state">No users found.</td>
       </tr>
       {% endfor %}
     </tbody>
@@ -126,30 +161,63 @@
       <form id="addUserForm" enctype="multipart/form-data">
         <input type="hidden" name="csrf_token" value="{{ csrf_token() }}">
 
-        <!-- Photo upload area -->
-        <div class="photo-upload-area" id="addPhotoArea">
-          <div class="photo-preview-wrap">
-            <div class="photo-placeholder" id="addPhotoPlaceholder">
-              <svg width="40" height="40" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.5">
-                <path d="M20 21v-2a4 4 0 0 0-4-4H8a4 4 0 0 0-4 4v2"></path>
-                <circle cx="12" cy="7" r="4"></circle>
-              </svg>
-              <span>No photo</span>
-            </div>
-            <img id="addPhotoPreview" class="photo-preview-img" src="" alt="Preview" style="display:none">
+        <!-- Face Training Samples (10 images) -->
+        <div class="samples-management-container">
+          <div class="samples-title-row">
+            <span class="form-label" style="font-weight:600;margin-bottom:0">Face Training Enrolment Samples (10 images recommended)</span>
+            <span class="samples-count-label" id="addSamplesCount">0 / 10 uploaded</span>
           </div>
-          <div class="photo-upload-controls">
-            <label class="btn btn-secondary photo-upload-btn" for="addPhotoInput">
-              <svg width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2">
+
+          <!-- Thumbnails grid -->
+          <div class="samples-grid" id="addSamplesGrid">
+            <div class="samples-empty-placeholder">
+              <svg width="24" height="24" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.5">
+                <path d="M23 19a2 2 0 0 1-2 2H3a2 2 0 0 1-2-2V8a2 2 0 0 1 2-2h4l2-3h6l2 3h4a2 2 0 0 1 2 2z"></path>
+                <circle cx="12" cy="13" r="4"></circle>
+              </svg>
+              No training photos enrolled yet.
+            </div>
+          </div>
+
+          <!-- Webcam inline capture stream -->
+          <div class="webcam-capture-panel" id="addWebcamPanel" style="display:none">
+            <div class="webcam-view-wrap">
+              <video id="addWebcamVideo" autoplay playsinline class="webcam-video-elem"></video>
+              <div class="webcam-countdown" id="addWebcamCountdown" style="display:none">3</div>
+              <div class="webcam-overlay-ring"></div>
+            </div>
+            <div class="webcam-controls-row">
+              <button type="button" class="btn btn-secondary btn-sm" onclick="stopWebcam('add')" style="padding:4px 10px;font-size:0.75rem">Close Camera</button>
+              <button type="button" class="btn btn-primary btn-sm" id="addStartCaptureBtn" onclick="startAutoCapture('add')" style="padding:4px 10px;font-size:0.75rem;background:linear-gradient(135deg,#2563eb,#06b6d4)">
+                <svg width="12" height="12" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" style="margin-right:2px"><circle cx="12" cy="12" r="10"></circle><circle cx="12" cy="12" r="3"></circle></svg>
+                Auto-Capture 10 Frames
+              </button>
+              <button type="button" class="btn btn-secondary btn-sm" onclick="captureManualFrame('add')" style="padding:4px 10px;font-size:0.75rem">Capture Single Frame</button>
+            </div>
+            <div class="webcam-instruction-text">Tilt your head slowly in different directions while auto-capturing to get a robust profile.</div>
+          </div>
+
+          <!-- Controls to add photos -->
+          <div class="samples-controls-bar">
+            <!-- Upload from system button -->
+            <label class="btn btn-secondary" for="addMultipleSamplesInput" style="display:inline-flex;align-items:center;gap:.3rem;cursor:pointer;padding:6px 12px;font-size:0.8rem">
+              <svg width="15" height="15" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2">
                 <path d="M21 15v4a2 2 0 0 1-2 2H5a2 2 0 0 1-2-2v-4"></path>
                 <polyline points="17 8 12 3 7 8"></polyline>
                 <line x1="12" y1="3" x2="12" y2="15"></line>
               </svg>
-              Upload Photo
+              Upload Images
             </label>
-            <input type="file" id="addPhotoInput" name="photo" accept="image/*" class="photo-file-input"
-              onchange="previewPhoto(this,'addPhotoPreview','addPhotoPlaceholder')">
-            <p class="photo-hint">JPG, PNG, GIF or WebP · max 5 MB</p>
+            <input type="file" id="addMultipleSamplesInput" accept="image/*" multiple style="display:none" onchange="handleMultipleUpload(this, 'add')">
+
+            <!-- Open webcam button -->
+            <button type="button" class="btn btn-secondary" style="display:inline-flex;align-items:center;gap:.3rem;padding:6px 12px;font-size:0.8rem" onclick="openWebcam('add')">
+              <svg width="15" height="15" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2">
+                <path d="M23 19a2 2 0 0 1-2 2H3a2 2 0 0 1-2-2V8a2 2 0 0 1 2-2h4l2-3h6l2 3h4a2 2 0 0 1 2 2z"></path>
+                <circle cx="12" cy="13" r="4"></circle>
+              </svg>
+              Capture from Webcam
+            </button>
           </div>
         </div>
 
@@ -216,31 +284,65 @@
         <input type="hidden" name="csrf_token" value="{{ csrf_token() }}">
         <input type="hidden" id="editUserId">
 
-        <!-- Photo upload area -->
-        <div class="photo-upload-area">
-          <div class="photo-preview-wrap">
-            <div class="photo-placeholder" id="editPhotoPlaceholder">
-              <svg width="40" height="40" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.5">
-                <path d="M20 21v-2a4 4 0 0 0-4-4H8a4 4 0 0 0-4 4v2"></path>
-                <circle cx="12" cy="7" r="4"></circle>
-              </svg>
-              <span>No photo</span>
-            </div>
-            <img id="editPhotoPreview" class="photo-preview-img" src="" alt="Preview" style="display:none">
+        <!-- Face Training Samples (10 images) -->
+        <div class="samples-management-container">
+          <div class="samples-title-row">
+            <span class="form-label" style="font-weight:600;margin-bottom:0">Face Training Enrolment Samples (10 images recommended)</span>
+            <span class="samples-count-label" id="editSamplesCount">0 / 10 uploaded</span>
           </div>
-          <div class="photo-upload-controls">
-            <label class="btn btn-secondary photo-upload-btn" for="editPhotoInput">
-              <svg width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2">
+
+          <!-- Thumbnails grid -->
+          <div class="samples-grid" id="editSamplesGrid">
+            <div class="samples-empty-placeholder">
+              <svg width="24" height="24" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.5">
+                <path d="M23 19a2 2 0 0 1-2 2H3a2 2 0 0 1-2-2V8a2 2 0 0 1 2-2h4l2-3h6l2 3h4a2 2 0 0 1 2 2z"></path>
+                <circle cx="12" cy="13" r="4"></circle>
+              </svg>
+              No training photos enrolled yet.
+            </div>
+          </div>
+
+          <!-- Webcam inline capture stream -->
+          <div class="webcam-capture-panel" id="editWebcamPanel" style="display:none">
+            <div class="webcam-view-wrap">
+              <video id="editWebcamVideo" autoplay playsinline class="webcam-video-elem"></video>
+              <div class="webcam-countdown" id="editWebcamCountdown" style="display:none">3</div>
+              <div class="webcam-overlay-ring"></div>
+            </div>
+            <div class="webcam-controls-row">
+              <button type="button" class="btn btn-secondary btn-sm" onclick="stopWebcam('edit')" style="padding:4px 10px;font-size:0.75rem">Close Camera</button>
+              <button type="button" class="btn btn-primary btn-sm" id="editStartCaptureBtn" onclick="startAutoCapture('edit')" style="padding:4px 10px;font-size:0.75rem;background:linear-gradient(135deg,#2563eb,#06b6d4)">
+                <svg width="12" height="12" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" style="margin-right:2px"><circle cx="12" cy="12" r="10"></circle><circle cx="12" cy="12" r="3"></circle></svg>
+                Auto-Capture 10 Frames
+              </button>
+              <button type="button" class="btn btn-secondary btn-sm" onclick="captureManualFrame('edit')" style="padding:4px 10px;font-size:0.75rem">Capture Single Frame</button>
+            </div>
+            <div class="webcam-instruction-text">Tilt your head slowly in different directions while auto-capturing to get a robust profile.</div>
+          </div>
+
+          <!-- Controls to add photos -->
+          <div class="samples-controls-bar">
+            <!-- Upload from system button -->
+            <label class="btn btn-secondary" for="editMultipleSamplesInput" style="display:inline-flex;align-items:center;gap:.3rem;cursor:pointer;padding:6px 12px;font-size:0.8rem">
+              <svg width="15" height="15" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2">
                 <path d="M21 15v4a2 2 0 0 1-2 2H5a2 2 0 0 1-2-2v-4"></path>
                 <polyline points="17 8 12 3 7 8"></polyline>
                 <line x1="12" y1="3" x2="12" y2="15"></line>
               </svg>
-              Change Photo
+              Upload Images
             </label>
-            <input type="file" id="editPhotoInput" name="photo" accept="image/*" class="photo-file-input"
-              onchange="previewPhoto(this,'editPhotoPreview','editPhotoPlaceholder')">
-            <p class="photo-hint">Leave empty to keep existing photo</p>
+            <input type="file" id="editMultipleSamplesInput" accept="image/*" multiple style="display:none" onchange="handleMultipleUpload(this, 'edit')">
+
+            <!-- Open webcam button -->
+            <button type="button" class="btn btn-secondary" style="display:inline-flex;align-items:center;gap:.3rem;padding:6px 12px;font-size:0.8rem" onclick="openWebcam('edit')">
+              <svg width="15" height="15" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2">
+                <path d="M23 19a2 2 0 0 1-2 2H3a2 2 0 0 1-2-2V8a2 2 0 0 1 2-2h4l2-3h6l2 3h4a2 2 0 0 1 2 2z"></path>
+                <circle cx="12" cy="13" r="4"></circle>
+              </svg>
+              Capture from Webcam
+            </button>
           </div>
+          <p style="font-size:0.75rem;color:var(--muted);margin-top:0.4rem;margin-bottom:0">Leave empty to keep existing training photos.</p>
         </div>
 
         <div class="form-grid-2">
@@ -363,20 +465,236 @@
     }
   }
 
+  // ── Multiple Samples & Webcam Logic ────────────────────────────────────────
+  let addSamplesList = [];
+  let editSamplesList = [];
+  let webcamStream = null;
+  let captureInterval = null;
+
+  function dataURLtoBlob(dataurl) {
+    let arr = dataurl.split(','), mime = arr[0].match(/:(.*?);/)[1],
+        bstr = atob(arr[1]), n = bstr.length, u8arr = new Uint8Array(n);
+    while(n--){
+        u8arr[n] = bstr.charCodeAt(n);
+    }
+    return new Blob([u8arr], {type:mime});
+  }
+
+  function handleMultipleUpload(input, prefix) {
+    const list = prefix === 'add' ? addSamplesList : editSamplesList;
+    if (input.files) {
+      Array.from(input.files).forEach(file => {
+        if (list.length >= 10) return;
+        const reader = new FileReader();
+        reader.onload = e => {
+          if (list.length >= 10) return;
+          list.push({
+            dataUrl: e.target.result,
+            file: file
+          });
+          renderSamples(prefix);
+        };
+        reader.readAsDataURL(file);
+      });
+    }
+    input.value = '';
+  }
+
+  async function openWebcam(prefix) {
+    stopWebcam(prefix);
+    const video = document.getElementById(prefix + 'WebcamVideo');
+    const panel = document.getElementById(prefix + 'WebcamPanel');
+    
+    try {
+      webcamStream = await navigator.mediaDevices.getUserMedia({ video: { width: 400, height: 300 } });
+      video.srcObject = webcamStream;
+      panel.style.display = 'block';
+    } catch(err) {
+      showToast('Could not access webcam: ' + err.message, 'error');
+    }
+  }
+
+  function stopWebcam(prefix) {
+    if (captureInterval) {
+      clearInterval(captureInterval);
+      captureInterval = null;
+    }
+    const video = document.getElementById(prefix + 'WebcamVideo');
+    const panel = document.getElementById(prefix + 'WebcamPanel');
+    const startBtn = document.getElementById(prefix + 'StartCaptureBtn');
+    
+    if (video && video.srcObject) {
+      const stream = video.srcObject;
+      stream.getTracks().forEach(track => track.stop());
+      video.srcObject = null;
+    }
+    if (webcamStream) {
+      webcamStream.getTracks().forEach(track => track.stop());
+      webcamStream = null;
+    }
+    if (panel) panel.style.display = 'none';
+    if (startBtn) {
+      startBtn.disabled = false;
+      startBtn.innerHTML = '<svg width="12" height="12" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" style="margin-right:2px"><circle cx="12" cy="12" r="10"></circle><circle cx="12" cy="12" r="3"></circle></svg> Auto-Capture 10 Frames';
+    }
+  }
+
+  function startAutoCapture(prefix) {
+    const list = prefix === 'add' ? addSamplesList : editSamplesList;
+    if (list.length >= 10) {
+      showToast('Maximum of 10 samples reached.', 'warning');
+      return;
+    }
+
+    const video = document.getElementById(prefix + 'WebcamVideo');
+    const countdown = document.getElementById(prefix + 'WebcamCountdown');
+    const startBtn = document.getElementById(prefix + 'StartCaptureBtn');
+    
+    if (!video || !video.srcObject) return;
+
+    startBtn.disabled = true;
+    countdown.style.display = 'flex';
+    
+    let count = 3;
+    countdown.textContent = count;
+    
+    let timer = setInterval(() => {
+      count--;
+      if (count > 0) {
+        countdown.textContent = count;
+      } else {
+        clearInterval(timer);
+        countdown.style.display = 'none';
+        
+        let captured = 0;
+        let target = 10 - list.length;
+        if (target <= 0) {
+          startBtn.disabled = false;
+          return;
+        }
+        
+        startBtn.innerHTML = `Capturing (0/${target})…`;
+        
+        captureInterval = setInterval(() => {
+          if (list.length >= 10 || captured >= target) {
+            clearInterval(captureInterval);
+            captureInterval = null;
+            startBtn.disabled = false;
+            startBtn.innerHTML = '<svg width="12" height="12" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" style="margin-right:2px"><circle cx="12" cy="12" r="10"></circle><circle cx="12" cy="12" r="3"></circle></svg> Auto-Capture 10 Frames';
+            stopWebcam(prefix);
+            showToast(`Auto-capture complete: added ${captured} frames.`);
+            return;
+          }
+          
+          captureSingleFrameIntoList(video, list);
+          captured++;
+          startBtn.innerHTML = `Capturing (${captured}/${target})…`;
+          renderSamples(prefix);
+        }, 450);
+      }
+    }, 1000);
+  }
+
+  function captureManualFrame(prefix) {
+    const list = prefix === 'add' ? addSamplesList : editSamplesList;
+    if (list.length >= 10) {
+      showToast('Maximum of 10 samples reached.', 'warning');
+      return;
+    }
+    const video = document.getElementById(prefix + 'WebcamVideo');
+    if (!video || !video.srcObject) return;
+    captureSingleFrameIntoList(video, list);
+    renderSamples(prefix);
+    showToast('Frame captured.');
+  }
+
+  function captureSingleFrameIntoList(video, list) {
+    const canvas = document.createElement('canvas');
+    canvas.width = 400;
+    canvas.height = 300;
+    const ctx = canvas.getContext('2d');
+    ctx.translate(canvas.width, 0);
+    ctx.scale(-1, 1);
+    ctx.drawImage(video, 0, 0, canvas.width, canvas.height);
+    
+    const dataUrl = canvas.toDataURL('image/jpeg', 0.9);
+    list.push({
+      dataUrl: dataUrl,
+      file: null
+    });
+  }
+
+  function renderSamples(prefix) {
+    const list = prefix === 'add' ? addSamplesList : editSamplesList;
+    const grid = document.getElementById(prefix + 'SamplesGrid');
+    const label = document.getElementById(prefix + 'SamplesCount');
+    
+    grid.innerHTML = '';
+    label.textContent = `${list.length} / 10 uploaded`;
+    
+    if (list.length === 0) {
+      grid.innerHTML = `
+        <div class="samples-empty-placeholder">
+          <svg width="24" height="24" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.5">
+            <path d="M23 19a2 2 0 0 1-2 2H3a2 2 0 0 1-2-2V8a2 2 0 0 1 2-2h4l2-3h6l2 3h4a2 2 0 0 1 2 2z"></path>
+            <circle cx="12" cy="13" r="4"></circle>
+          </svg>
+          No training photos enrolled yet.
+        </div>`;
+      return;
+    }
+    
+    list.forEach((item, index) => {
+      const card = document.createElement('div');
+      card.className = 'sample-thumb-card';
+      card.innerHTML = `
+        <img src="${item.dataUrl}" alt="Sample ${index + 1}">
+        <span class="sample-badge">#${index + 1}</span>
+        <button type="button" class="sample-remove-btn" onclick="removeSample('${prefix}', ${index})">&times;</button>
+      `;
+      grid.appendChild(card);
+    });
+  }
+
+  function removeSample(prefix, index) {
+    const list = prefix === 'add' ? addSamplesList : editSamplesList;
+    list.splice(index, 1);
+    renderSamples(prefix);
+  }
+
   // ── Add User ──────────────────────────────────────────────────────────────
   function openAddUserModal() {
     document.getElementById('addUserForm').reset();
-    document.getElementById('addPhotoPreview').style.display = 'none';
-    document.getElementById('addPhotoPlaceholder').style.display = 'flex';
+    addSamplesList = [];
+    renderSamples('add');
+    stopWebcam('add');
     document.getElementById('addUserModal').classList.add('active');
   }
   function closeAddUserModal() {
+    stopWebcam('add');
     document.getElementById('addUserModal').classList.remove('active');
   }
   function submitAddUser() {
     const form = document.getElementById('addUserForm');
     if (!form.checkValidity()) { form.reportValidity(); return; }
-    fetch('{{ url_for("add_user") }}', { method: 'POST', body: new FormData(form) })
+
+    if (addSamplesList.length < 5) {
+      if (!confirm(`You have only uploaded/captured ${addSamplesList.length} sample images. Enrolling 10-15 images is highly recommended for best facial recognition accuracy. Do you want to proceed?`)) {
+        return;
+      }
+    }
+
+    const formData = new FormData(form);
+    addSamplesList.forEach((item, index) => {
+      if (item.file) {
+        formData.append('samples', item.file);
+      } else if (item.dataUrl) {
+        const blob = dataURLtoBlob(item.dataUrl);
+        formData.append('samples', blob, `captured_sample_${index}.jpg`);
+      }
+    });
+
+    fetch('{{ url_for("add_user") }}', { method: 'POST', body: formData })
       .then(r => r.json())
       .then(res => {
         if (res.success) {
@@ -399,30 +717,68 @@
     document.getElementById('editRole').value = role;
     document.getElementById('editStatus').value = status;
 
-    // Restore photo preview
-    const preview = document.getElementById('editPhotoPreview');
-    const placeholder = document.getElementById('editPhotoPlaceholder');
-    if (photoPath) {
-      preview.src = '/uploads/' + photoPath;
-      preview.style.display = 'block';
-      placeholder.style.display = 'none';
-    } else {
-      preview.style.display = 'none';
-      placeholder.style.display = 'flex';
-    }
+    editSamplesList = [];
+    stopWebcam('edit');
 
-    // Reset file input
-    document.getElementById('editPhotoInput').value = '';
+    // Fetch existing user to load their sample photos if any
+    const grid = document.getElementById('editSamplesGrid');
+    grid.innerHTML = '<div class="samples-empty-placeholder"><div class="spin" style="width:20px;height:20px;border:2px solid var(--cyan);border-top-color:transparent;border-radius:50%"></div> Loading photos…</div>';
+    
+    // We can query custom details or just download the photos list from app.py or display current thumbnail
+    if (photoPath) {
+      // For editing: we will pull user data to see if photos array has items
+      // For now, let's load the primary photo
+      editSamplesList = [{
+        dataUrl: '/uploads/' + photoPath,
+        file: null,
+        isExisting: true
+      }];
+    }
+    
+    // Check if there is photos array
+    const userRow = document.querySelector(`#usersTableBody tr[data-id="${id}"]`);
+    // Alternatively fetch the photos list from user row dataset or a quick api call.
+    // To make it easy, we can just fetch the user detail via custom script or pass them through a helper attribute.
+    // Let's call standard fetch to get user info if needed, but since we have row datasets:
+    // Let's add user data attribute to action button in users.html
+    const btn = document.querySelector(`.action-btn[data-id="${id}"][title="Edit user"]`);
+    if (btn && btn.dataset.photos) {
+      try {
+        const photoKeys = JSON.parse(btn.dataset.photos);
+        if (photoKeys && photoKeys.length > 0) {
+          editSamplesList = photoKeys.map(k => ({
+            dataUrl: '/uploads/' + k,
+            file: null,
+            isExisting: true
+          }));
+        }
+      } catch(e) {}
+    }
+    
+    renderSamples('edit');
     document.getElementById('editUserModal').classList.add('active');
   }
   function closeEditUserModal() {
+    stopWebcam('edit');
     document.getElementById('editUserModal').classList.remove('active');
   }
   function submitEditUser() {
     const form = document.getElementById('editUserForm');
     if (!form.checkValidity()) { form.reportValidity(); return; }
+    
     const userId = document.getElementById('editUserId').value;
-    fetch(`/users/${userId}/edit`, { method: 'POST', body: new FormData(form) })
+    const formData = new FormData(form);
+
+    editSamplesList.forEach((item, index) => {
+      if (item.file) {
+        formData.append('samples', item.file);
+      } else if (item.dataUrl && !item.isExisting) {
+        const blob = dataURLtoBlob(item.dataUrl);
+        formData.append('samples', blob, `captured_sample_${index}.jpg`);
+      }
+    });
+
+    fetch(`/users/${userId}/edit`, { method: 'POST', body: formData })
       .then(r => r.json())
       .then(res => {
         if (res.success) {
@@ -462,5 +818,576 @@
         }
       });
   }
+
+  // ── Bluetooth MAC Modal ─────────────────────────────────────────────────────
+  let _btModalUserId = null;
+
+  function openBtMacModal(btn) {
+    _btModalUserId = btn.dataset.id;
+    document.getElementById('btMacModalTitle').textContent =
+      'Bluetooth Device — ' + btn.dataset.fullname;
+    document.getElementById('btMacInput').value = btn.dataset.mac || '';
+
+    // Reset scan tab UI
+    document.getElementById('deviceList').innerHTML =
+      '<div class="bt-device-empty">Click <strong>Scan</strong> to discover nearby Bluetooth devices.</div>';
+    document.getElementById('deviceCount').textContent = '';
+    document.getElementById('scanSpinner').style.display = 'none';
+    document.getElementById('btSelectedPreview').style.display = 'none';
+    document.getElementById('btnScanDevices').disabled = false;
+    document.getElementById('btnScanDevices').innerHTML =
+      '<svg width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><polyline points="6.5 6.5 17.5 17.5 12 23 12 1 17.5 6.5 6.5 17.5"></polyline></svg> Scan';
+
+    // Always open on the Scan tab
+    switchBtTab('scan');
+
+    document.getElementById('btMacModal').classList.add('active');
+  }
+
+  function closeBtMacModal() {
+    document.getElementById('btMacModal').classList.remove('active');
+    _btModalUserId = null;
+  }
+
+  // Auto-format MAC as user types
+  document.addEventListener('DOMContentLoaded', () => {
+    document.getElementById('btMacInput').addEventListener('input', function() {
+      let v = this.value.replace(/[^0-9A-Fa-f]/g,'').toUpperCase();
+      let f = v.match(/.{1,2}/g)?.join(':') || '';
+      if (f.length > 17) f = f.slice(0,17);
+      this.value = f;
+    });
+  });
+
+  function saveBtMac() {
+    if (!_btModalUserId) return;
+    const mac  = document.getElementById('btMacInput').value.trim();
+    const csrf = document.querySelector('#addUserForm [name=csrf_token]').value;
+
+    if (mac && !/^([0-9A-F]{2}:){5}[0-9A-F]{2}$/.test(mac)) {
+      showToast('Invalid MAC format. Use XX:XX:XX:XX:XX:XX', 'error');
+      return;
+    }
+
+    fetch(`/users/${_btModalUserId}/bluetooth`, {
+      method: 'POST',
+      headers: {'Content-Type':'application/json','X-CSRFToken':csrf},
+      body: JSON.stringify({ mac })
+    })
+    .then(r => r.json())
+    .then(res => {
+      if (res.success) {
+        // Update table cell in-place (no full reload)
+        const cell = document.getElementById(`btMacCell-${_btModalUserId}`);
+        if (cell) {
+          cell.innerHTML = mac
+            ? `<code style="font-size:.72rem;color:#06b6d4;letter-spacing:.03em">${mac}</code>`
+            : `<span style="color:#475569;font-size:.75rem;font-style:italic">Not set</span>`;
+        }
+        // Update the button's data-mac so re-opening shows current value
+        const setBtn = document.querySelector(
+          `.action-btn[data-id="${_btModalUserId}"][title="Set Bluetooth MAC"]`
+        );
+        if (setBtn) setBtn.dataset.mac = mac;
+
+        showToast(mac ? `BT MAC saved: ${mac}` : 'BT MAC cleared.');
+        closeBtMacModal();
+      } else {
+        showToast(res.error || 'Failed to save MAC.', 'error');
+      }
+    })
+    .catch(() => showToast('Network error saving MAC.', 'error'));
+  }
+
+  // ── Device scanner ──────────────────────────────────────────────────────────
+  let _scanRunning = false;
+
+  function switchBtTab(tab) {
+    document.querySelectorAll('.bt-tab-btn').forEach(b => b.classList.remove('active'));
+    document.querySelectorAll('.bt-tab-pane').forEach(p => p.classList.remove('active'));
+    document.getElementById(`btTab-${tab}`).classList.add('active');
+    document.getElementById(`btPane-${tab}`).classList.add('active');
+  }
+
+  async function scanNearbyDevices() {
+    if (_scanRunning) return;
+    _scanRunning = true;
+
+    const btn     = document.getElementById('btnScanDevices');
+    const list    = document.getElementById('deviceList');
+    const spinner = document.getElementById('scanSpinner');
+    const counter = document.getElementById('deviceCount');
+
+    btn.disabled  = true;
+    btn.innerHTML = '<svg class="spin" width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><path d="M21 12a9 9 0 1 1-6.22-8.56"/></svg> Scanning…';
+    spinner.style.display = 'flex';
+    list.innerHTML = '';
+    counter.textContent = '';
+
+    try {
+      const csrf = document.querySelector('#addUserForm [name=csrf_token]').value;
+      const resp = await fetch('/bluetooth/scan-devices', {
+        method: 'POST',
+        headers: {'Content-Type':'application/json','X-CSRFToken':csrf},
+        body: JSON.stringify({ duration: 8 })
+      });
+      const data = await resp.json();
+
+      spinner.style.display = 'none';
+
+      if (!data.success) {
+        list.innerHTML = `<div class="bt-device-error">${data.message}</div>`;
+        return;
+      }
+
+      if (data.devices.length === 0) {
+        list.innerHTML = '<div class="bt-device-empty">No Bluetooth devices detected nearby.<br>Ensure your phone\'s Bluetooth is ON and not in stealth mode.</div>';
+        counter.textContent = '0 devices found';
+        return;
+      }
+
+      counter.textContent = data.message || `${data.devices.length} device(s) found`;
+
+      data.devices.forEach(dev => {
+        const isCurrent   = dev.mac === document.getElementById('btMacInput').value.trim().toUpperCase();
+        const isConnected = dev.connected;
+        const hasRssi     = dev.rssi !== null && dev.rssi !== undefined;
+        const rssiPct     = hasRssi ? Math.min(100, Math.max(0, ((dev.rssi + 100) / 70) * 100)) : 0;
+        const rssiClass   = rssiPct >= 60 ? 'strong' : rssiPct >= 35 ? 'medium' : 'weak';
+        const rssiHtml    = hasRssi
+          ? `<div class="bt-rssi-track"><div class="bt-rssi-fill ${rssiClass}" style="width:${rssiPct}%"></div></div>
+             <span class="bt-rssi-dbm">${dev.rssi} dBm</span>`
+          : `<span class="bt-rssi-dbm" style="color:#475569">Paired — no RSSI</span>`;
+
+        const sourceBadge = isConnected
+          ? `<span class="bt-conn-badge">Connected</span>`
+          : (dev.source === 'ble'
+              ? `<span class="bt-ble-badge">BLE</span>`
+              : `<span style="font-size:.65rem;color:#475569;margin-left:.25rem">Paired</span>`);
+
+        const card = document.createElement('div');
+        card.className = 'bt-device-card' + (isCurrent ? ' current' : '') + (isConnected ? ' connected' : '');
+        card.innerHTML = `
+          <div class="bt-device-icon${isConnected ? ' connected-icon' : ''}">
+            <svg width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2">
+              <polyline points="6.5 6.5 17.5 17.5 12 23 12 1 17.5 6.5 6.5 17.5"></polyline>
+            </svg>
+          </div>
+          <div class="bt-device-info">
+            <p class="bt-device-name">
+              ${dev.name}
+              ${sourceBadge}
+              ${isCurrent ? '<span class="bt-current-badge">Assigned</span>' : ''}
+            </p>
+            <p class="bt-device-mac">${dev.mac}</p>
+            <div class="bt-device-rssi">${rssiHtml}</div>
+          </div>
+          <button class="bt-select-btn${isCurrent ? ' selected' : ''}"
+                  onclick="selectDevice('${dev.mac}', '${dev.name.replace(/'/g,"\\'")}')">
+            ${isCurrent ? 'Assigned' : 'Select'}
+          </button>`;
+        list.appendChild(card);
+      });
+
+    } catch(err) {
+      spinner.style.display = 'none';
+      list.innerHTML = `<div class="bt-device-error">Scan failed: ${err.message}</div>`;
+    } finally {
+      _scanRunning = false;
+      btn.disabled = false;
+      btn.innerHTML = `<svg width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2">
+        <polyline points="6.5 6.5 17.5 17.5 12 23 12 1 17.5 6.5 6.5 17.5"></polyline></svg> Scan Again`;
+    }
+  }
+
+  function selectDevice(mac, name) {
+    document.getElementById('btMacInput').value = mac;
+    document.getElementById('btSelectedPreview').innerHTML =
+      `<svg width="13" height="13" viewBox="0 0 24 24" fill="none" stroke="#10b981" stroke-width="2.5">
+        <polyline points="20 6 9 17 4 12"></polyline></svg>
+       <strong style="color:#10b981">${name}</strong>
+       <code style="color:#06b6d4;font-family:monospace">${mac}</code>`;
+    document.getElementById('btSelectedPreview').style.display = 'flex';
+    // Switch to manual tab to show the filled MAC
+    switchBtTab('manual');
+  }
 </script>
+
+<style>
+/* ── BT MAC Modal — premium styles ─────────────────────────────── */
+#btMacModal .modal-content { max-width:540px; }
+
+.bt-tab-bar {
+  display:flex; gap:.25rem; padding:.75rem 1.25rem .5rem;
+  border-bottom:1px solid rgba(37,99,235,.15);
+}
+.bt-tab-btn {
+  flex:1; padding:.5rem; border:none; border-radius:.5rem;
+  background:transparent; color:#64748b; font-size:.8rem; font-weight:600;
+  cursor:pointer; transition:all .2s; display:flex; align-items:center; justify-content:center; gap:.4rem;
+}
+.bt-tab-btn:hover  { background:rgba(37,99,235,.08); color:#e2e8f0; }
+.bt-tab-btn.active { background:rgba(6,182,212,.12); color:#06b6d4; border:1px solid rgba(6,182,212,.25); }
+
+.bt-tab-pane { display:none; }
+.bt-tab-pane.active { display:block; }
+
+/* Scan tab */
+.bt-scan-header {
+  display:flex; align-items:center; justify-content:space-between;
+  gap:.75rem; margin-bottom:.75rem;
+}
+#btnScanDevices {
+  display:inline-flex; align-items:center; gap:.4rem;
+  padding:.45rem 1rem; border-radius:.6rem;
+  background:linear-gradient(135deg,#2563eb,#06b6d4);
+  color:#fff; border:none; font-size:.8rem; font-weight:600;
+  cursor:pointer; white-space:nowrap; transition:opacity .2s;
+}
+#btnScanDevices:hover:not(:disabled) { opacity:.85; }
+#btnScanDevices:disabled { opacity:.5; cursor:not-allowed; }
+#deviceCount { font-size:.75rem; color:#64748b; }
+
+#scanSpinner {
+  display:none; flex-direction:column; align-items:center; gap:.6rem;
+  padding:1.25rem; color:#64748b; font-size:.8rem;
+}
+.scan-dots span {
+  display:inline-block; width:8px; height:8px; border-radius:50%;
+  background:#06b6d4; margin:0 2px;
+  animation:dotBounce .9s infinite ease-in-out;
+}
+.scan-dots span:nth-child(2){ animation-delay:.15s; }
+.scan-dots span:nth-child(3){ animation-delay:.3s; }
+@keyframes dotBounce {
+  0%,80%,100%{ transform:scale(.6); opacity:.4; }
+  40%{ transform:scale(1); opacity:1; }
+}
+
+#deviceList {
+  max-height:260px; overflow-y:auto;
+  display:flex; flex-direction:column; gap:.5rem;
+}
+#deviceList::-webkit-scrollbar { width:4px; }
+#deviceList::-webkit-scrollbar-track { background:transparent; }
+#deviceList::-webkit-scrollbar-thumb { background:rgba(6,182,212,.3); border-radius:9999px; }
+
+.bt-device-card {
+  display:flex; align-items:center; gap:.75rem;
+  padding:.75rem; border-radius:.75rem;
+  border:1px solid rgba(37,99,235,.18);
+  background:rgba(15,23,42,.6); cursor:pointer;
+  transition:all .2s;
+}
+.bt-device-card:hover { border-color:rgba(6,182,212,.4); background:rgba(6,182,212,.06); }
+.bt-device-card.current { border-color:rgba(16,185,129,.4); background:rgba(16,185,129,.06); }
+
+.bt-device-icon {
+  width:36px; height:36px; border-radius:50%; flex-shrink:0;
+  background:rgba(37,99,235,.12); border:1px solid rgba(37,99,235,.25);
+  display:flex; align-items:center; justify-content:center; color:#06b6d4;
+}
+.bt-device-info  { flex:1; min-width:0; }
+.bt-device-name  { font-size:.85rem; font-weight:600; color:#e2e8f0; white-space:nowrap; overflow:hidden; text-overflow:ellipsis; }
+.bt-device-mac   { font-size:.72rem; font-family:monospace; color:#06b6d4; margin-top:.1rem; }
+.bt-current-badge{ background:rgba(16,185,129,.15); color:#10b981; font-size:.65rem; padding:.1rem .35rem; border-radius:9999px; font-weight:600; margin-left:.35rem; }
+
+.bt-device-rssi  { display:flex; align-items:center; gap:.5rem; margin-top:.35rem; }
+.bt-rssi-track   { flex:1; height:4px; background:rgba(255,255,255,.08); border-radius:9999px; overflow:hidden; }
+.bt-rssi-fill    { height:100%; border-radius:9999px; transition:width .4s; }
+.bt-rssi-fill.strong { background:linear-gradient(90deg,#10b981,#06b6d4); }
+.bt-rssi-fill.medium { background:linear-gradient(90deg,#f59e0b,#10b981); }
+.bt-rssi-fill.weak   { background:linear-gradient(90deg,#ef4444,#f59e0b); }
+.bt-rssi-dbm     { font-size:.68rem; color:#64748b; white-space:nowrap; }
+
+.bt-select-btn {
+  padding:.35rem .75rem; border-radius:.45rem; border:1px solid rgba(6,182,212,.35);
+  background:rgba(6,182,212,.1); color:#06b6d4; font-size:.75rem; font-weight:600;
+  cursor:pointer; white-space:nowrap; flex-shrink:0; transition:all .2s;
+}
+.bt-select-btn:hover { background:rgba(6,182,212,.25); border-color:#06b6d4; color:#fff; }
+.bt-device-card.current .bt-select-btn {
+  background:rgba(16,185,129,.15); border-color:rgba(16,185,129,.35); color:#10b981;
+}
+
+.bt-device-empty, .bt-device-error {
+  text-align:center; padding:1.5rem; font-size:.8rem; line-height:1.7;
+  color:#64748b; border:1px dashed rgba(255,255,255,.08); border-radius:.65rem;
+}
+.bt-device-error { color:#f87171; border-color:rgba(239,68,68,.2); }
+
+/* Selected preview strip */
+#btSelectedPreview {
+  display:none; align-items:center; gap:.5rem; flex-wrap:wrap;
+  padding:.5rem .75rem; background:rgba(16,185,129,.08);
+  border:1px solid rgba(16,185,129,.25); border-radius:.6rem;
+  font-size:.78rem; margin-top:.5rem;
+}
+
+/* Manual tab */
+.bt-manual-hint {
+  font-size:.75rem; color:#64748b; line-height:1.65; margin-top:.5rem;
+  padding:.6rem .75rem; background:rgba(6,182,212,.05);
+  border:1px solid rgba(6,182,212,.15); border-radius:.55rem;
+}
+
+/* ── Face Training Samples Container & Grid ──────────────────────── */
+.samples-management-container {
+  margin-top: 1.25rem;
+  margin-bottom: 1.25rem;
+  padding: 1rem;
+  background: rgba(255, 255, 255, 0.02);
+  border: 1px dashed rgba(21, 213, 238, 0.25);
+  border-radius: 12px;
+}
+.samples-title-row {
+  display: flex;
+  justify-content: space-between;
+  align-items: center;
+  margin-bottom: 0.75rem;
+}
+.samples-count-label {
+  font-size: 0.78rem;
+  font-weight: 600;
+  color: var(--cyan);
+  background: rgba(21, 213, 238, 0.1);
+  padding: 2px 8px;
+  border-radius: 99px;
+}
+.samples-grid {
+  display: grid;
+  grid-template-columns: repeat(auto-fill, minmax(80px, 1fr));
+  gap: 0.5rem;
+  margin-bottom: 1rem;
+  min-height: 90px;
+  padding: 0.5rem;
+  background: rgba(0, 0, 0, 0.2);
+  border-radius: 8px;
+  border: 1px solid rgba(255, 255, 255, 0.05);
+}
+.samples-empty-placeholder {
+  grid-column: 1 / -1;
+  display: flex;
+  flex-direction: column;
+  align-items: center;
+  justify-content: center;
+  gap: 0.35rem;
+  color: var(--dim);
+  font-size: 0.8rem;
+  padding: 1rem 0;
+}
+.sample-thumb-card {
+  position: relative;
+  aspect-ratio: 4 / 3;
+  border-radius: 6px;
+  overflow: hidden;
+  border: 1px solid rgba(255, 255, 255, 0.1);
+  background: #000;
+}
+.sample-thumb-card img {
+  width: 100%;
+  height: 100%;
+  object-fit: cover;
+}
+.sample-badge {
+  position: absolute;
+  top: 2px;
+  left: 2px;
+  background: rgba(0, 0, 0, 0.75);
+  color: #fff;
+  font-size: 0.6rem;
+  font-weight: 700;
+  padding: 1px 4px;
+  border-radius: 3px;
+  line-height: 1;
+}
+.sample-remove-btn {
+  position: absolute;
+  top: 2px;
+  right: 2px;
+  width: 16px;
+  height: 16px;
+  border-radius: 50%;
+  background: var(--danger);
+  color: #000;
+  border: none;
+  font-size: 0.7rem;
+  font-weight: 700;
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  cursor: pointer;
+  line-height: 1;
+}
+.sample-remove-btn:hover {
+  transform: scale(1.1);
+}
+
+/* Webcam capture panel styles */
+.webcam-capture-panel {
+  padding: 0.75rem;
+  background: rgba(0, 0, 0, 0.4);
+  border-radius: 8px;
+  border: 1px solid rgba(21, 213, 238, 0.15);
+  margin-bottom: 1rem;
+}
+.webcam-view-wrap {
+  position: relative;
+  width: 100%;
+  max-width: 320px;
+  margin: 0 auto 0.75rem;
+  aspect-ratio: 4 / 3;
+  border-radius: 8px;
+  overflow: hidden;
+  border: 2px solid rgba(21, 213, 238, 0.3);
+  background: #000;
+}
+.webcam-video-elem {
+  width: 100%;
+  height: 100%;
+  object-fit: cover;
+  transform: scaleX(-1); /* mirror preview */
+}
+.webcam-countdown {
+  position: absolute;
+  top: 0; left: 0; right: 0; bottom: 0;
+  background: rgba(0, 0, 0, 0.7);
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  color: var(--cyan);
+  font-size: 3rem;
+  font-weight: 800;
+  z-index: 10;
+}
+.webcam-overlay-ring {
+  position: absolute;
+  top: 10px; left: 10px; right: 10px; bottom: 10px;
+  border: 2px dashed rgba(21, 213, 238, 0.35);
+  border-radius: 6px;
+  pointer-events: none;
+}
+.webcam-controls-row {
+  display: flex;
+  justify-content: center;
+  gap: 0.5rem;
+  flex-wrap: wrap;
+}
+.webcam-instruction-text {
+  text-align: center;
+  font-size: 0.75rem;
+  color: var(--muted);
+  margin-top: 0.5rem;
+  line-height: 1.4;
+}
+.samples-controls-bar {
+  display: flex;
+  gap: 0.5rem;
+  justify-content: flex-start;
+}
+
+@keyframes spin { to{ transform:rotate(360deg); } }
+.spin { animation:spin .8s linear infinite; }
+</style>
+
+<!-- ── BT MAC Modal — with device scanner ──────────────────────────── -->
+<div class="modal" id="btMacModal" role="dialog" aria-modal="true" aria-labelledby="btMacModalTitle">
+  <div class="modal-content">
+    <div class="modal-header" style="border-bottom:1px solid rgba(37,99,235,.2)">
+      <h2 id="btMacModalTitle" style="display:flex;align-items:center;gap:.5rem">
+        <svg width="18" height="18" viewBox="0 0 24 24" fill="none" stroke="#06b6d4" stroke-width="2">
+          <polyline points="6.5 6.5 17.5 17.5 12 23 12 1 17.5 6.5 6.5 17.5"></polyline>
+        </svg>
+        Bluetooth Device Assignment
+      </h2>
+      <button class="modal-close" onclick="closeBtMacModal()" aria-label="Close">&times;</button>
+    </div>
+
+    <!-- Tab bar -->
+    <div class="bt-tab-bar">
+      <button class="bt-tab-btn active" id="btTab-scan" onclick="switchBtTab('scan')">
+        <svg width="13" height="13" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2">
+          <polyline points="6.5 6.5 17.5 17.5 12 23 12 1 17.5 6.5 6.5 17.5"></polyline>
+        </svg>
+        Scan Nearby Devices
+      </button>
+      <button class="bt-tab-btn" id="btTab-manual" onclick="switchBtTab('manual')">
+        <svg width="13" height="13" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2">
+          <path d="M11 4H4a2 2 0 0 0-2 2v14a2 2 0 0 0 2 2h14a2 2 0 0 0 2-2v-7"/>
+          <path d="M18.5 2.5a2.121 2.121 0 0 1 3 3L12 15l-4 1 1-4 9.5-9.5z"/>
+        </svg>
+        Manual Entry
+      </button>
+    </div>
+
+    <div class="modal-body">
+
+      <!-- ── TAB: Scan ─────────────────────────────────────────── -->
+      <div class="bt-tab-pane active" id="btPane-scan">
+        <div class="bt-scan-header">
+          <p style="font-size:.8rem;color:#64748b;line-height:1.5;flex:1">
+            Scans for all Bluetooth devices visible from this machine.
+            Turn on your phone's Bluetooth, then click <strong style="color:#06b6d4">Scan</strong>.
+          </p>
+          <button id="btnScanDevices" onclick="scanNearbyDevices()">
+            <svg width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2">
+              <polyline points="6.5 6.5 17.5 17.5 12 23 12 1 17.5 6.5 6.5 17.5"></polyline>
+            </svg>
+            Scan
+          </button>
+        </div>
+
+        <div id="scanSpinner">
+          <div class="scan-dots">
+            <span></span><span></span><span></span>
+          </div>
+          <span>Scanning for Bluetooth devices… (~8 seconds)</span>
+        </div>
+
+        <div style="display:flex;align-items:center;justify-content:space-between;margin-bottom:.4rem">
+          <span style="font-size:.72rem;font-weight:600;color:#475569;text-transform:uppercase;letter-spacing:.05em">Discovered Devices</span>
+          <span id="deviceCount" style="font-size:.72rem;color:#64748b"></span>
+        </div>
+        <div id="deviceList">
+          <div class="bt-device-empty">Click <strong>Scan</strong> to discover nearby Bluetooth devices.</div>
+        </div>
+
+        <div id="btSelectedPreview"></div>
+      </div>
+
+      <!-- ── TAB: Manual entry ──────────────────────────────────── -->
+      <div class="bt-tab-pane" id="btPane-manual">
+        <div class="form-group" style="margin-bottom:.75rem">
+          <label class="form-label">
+            Bluetooth MAC Address
+            <span style="font-weight:400;color:#64748b;font-size:.78rem">(XX:XX:XX:XX:XX:XX)</span>
+          </label>
+          <input type="text" id="btMacInput" class="form-input"
+                 placeholder="AA:BB:CC:DD:EE:FF"
+                 maxlength="17" autocomplete="off" spellcheck="false"
+                 style="font-family:monospace;font-size:1rem;letter-spacing:.08em">
+        </div>
+        <div class="bt-manual-hint">
+          <strong>How to find your Bluetooth MAC:</strong><br>
+          🤖 <strong>Android:</strong> Settings → About Phone → Status → Bluetooth Address<br>
+          🍎 <strong style="color:#f59e0b">iOS 14+:</strong> Randomises MAC for privacy — use the <em>Scan</em> tab and look for your iPhone's device name instead.
+          <br><br>
+          Leave the field <strong>empty</strong> and save to <em>clear</em> the assigned device.
+        </div>
+      </div>
+
+    </div><!-- /modal-body -->
+
+    <div class="modal-footer">
+      <button class="btn btn-secondary" onclick="closeBtMacModal()">Cancel</button>
+      <button class="btn btn-primary" onclick="saveBtMac()"
+              style="background:linear-gradient(135deg,#2563eb,#06b6d4)">
+        <svg width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.5">
+          <polyline points="20 6 9 17 4 12"></polyline>
+        </svg>
+        Save MAC
+      </button>
+    </div>
+  </div>
+</div>
 {% endblock %}

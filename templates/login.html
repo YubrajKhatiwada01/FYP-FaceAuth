@@ -22,7 +22,7 @@
   </div>
 
   <form class="login-card" method="post" novalidate>
-    <input type="hidden" name="csrf_token" value="{{ csrf_token }}"/>
+    <input type="hidden" name="csrf_token" value="{{ csrf_token() }}"/>
     <div class="field-row">
       <label for="operator_id">Operator ID</label>
       <span>Secure_Channel_A</span>

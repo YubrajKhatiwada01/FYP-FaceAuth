@@ -1,0 +1,787 @@
+{% extends "dashboard_base.html" %}
+
+{% block title %}FaceAuth | Bluetooth 2FA{% endblock %}
+{% block dashboard_title %}Bluetooth 2FA{% endblock %}
+{% block dashboard_subtitle %}Manage phone proximity authentication for registered users{% endblock %}
+{% block dashboard_notifications_count %}0{% endblock %}
+
+{% block dashboard_content %}
+<style>
+/* ── BT Page Variables ──────────────────────────────────────────── */
+:root {
+  --bt-primary:   #2563eb;
+  --bt-accent:    #06b6d4;
+  --bt-success:   #10b981;
+  --bt-warning:   #f59e0b;
+  --bt-danger:    #ef4444;
+  --bt-glow:      rgba(37,99,235,0.35);
+  --bt-card-bg:   rgba(15,23,42,0.7);
+  --bt-border:    rgba(37,99,235,0.25);
+}
+
+/* ── Layout ─────────────────────────────────────────────────────── */
+.bt-layout { display:grid; grid-template-columns:340px 1fr; gap:1.5rem; align-items:start; }
+@media(max-width:900px){ .bt-layout{ grid-template-columns:1fr; } }
+
+/* ── Hero signal card ───────────────────────────────────────────── */
+.bt-hero-card {
+  background: var(--bt-card-bg);
+  border: 1px solid var(--bt-border);
+  border-radius:1.25rem;
+  padding:2rem 1.5rem;
+  display:flex; flex-direction:column; align-items:center; gap:1.25rem;
+  position:relative; overflow:hidden;
+}
+.bt-hero-card::before {
+  content:''; position:absolute; inset:0;
+  background: radial-gradient(ellipse at 50% 30%, rgba(37,99,235,0.12) 0%, transparent 70%);
+  pointer-events:none;
+}
+
+/* Signal rings */
+.bt-signal-wrap { position:relative; width:160px; height:160px; display:flex; align-items:center; justify-content:center; }
+.bt-ring {
+  position:absolute; border-radius:50%;
+  border:2px solid var(--bt-accent);
+  opacity:0; animation:btPulse 2.4s ease-out infinite;
+}
+.bt-ring:nth-child(1){ width:60px;  height:60px;  animation-delay:0s;    border-color:var(--bt-primary); }
+.bt-ring:nth-child(2){ width:100px; height:100px; animation-delay:0.6s;  border-color:var(--bt-accent); }
+.bt-ring:nth-child(3){ width:140px; height:140px; animation-delay:1.2s;  border-color:var(--bt-primary); }
+.bt-ring:nth-child(4){ width:180px; height:180px; animation-delay:1.8s; border-color:var(--bt-accent); opacity:0.3; }
+@keyframes btPulse {
+  0%  { opacity:0;   transform:scale(0.6); }
+  30% { opacity:0.7; }
+  100%{ opacity:0;   transform:scale(1.1); }
+}
+
+.bt-icon-center {
+  position:relative; z-index:2;
+  width:52px; height:52px;
+  background:linear-gradient(135deg, var(--bt-primary), var(--bt-accent));
+  border-radius:50%; display:flex; align-items:center; justify-content:center;
+  box-shadow: 0 0 30px var(--bt-glow);
+}
+
+.bt-status-badge {
+  display:inline-flex; align-items:center; gap:.45rem;
+  padding:.35rem .9rem; border-radius:9999px; font-size:.75rem; font-weight:600;
+  letter-spacing:.04em; text-transform:uppercase;
+}
+.bt-status-badge.available   { background:rgba(16,185,129,.15); color:#10b981; border:1px solid rgba(16,185,129,.3); }
+.bt-status-badge.unavailable { background:rgba(239,68,68,.15);  color:#ef4444; border:1px solid rgba(239,68,68,.3); }
+
+.bt-stats-row { display:flex; gap:.75rem; width:100%; }
+.bt-stat-box {
+  flex:1; text-align:center; background:rgba(37,99,235,.08);
+  border:1px solid rgba(37,99,235,.18); border-radius:.75rem; padding:.75rem .5rem;
+}
+.bt-stat-val { font-size:1.5rem; font-weight:700; color:var(--bt-accent); }
+.bt-stat-lbl { font-size:.65rem; color:var(----color-text-muted,#94a3b8); text-transform:uppercase; letter-spacing:.06em; }
+
+/* ── Right panel ────────────────────────────────────────────────── */
+.bt-right-panel { display:flex; flex-direction:column; gap:1.25rem; }
+
+/* ── Section card ───────────────────────────────────────────────── */
+.bt-card {
+  background:var(--bt-card-bg);
+  border:1px solid var(--bt-border);
+  border-radius:1.25rem;
+  overflow:hidden;
+}
+.bt-card-header {
+  display:flex; align-items:center; justify-content:space-between;
+  padding:1rem 1.5rem;
+  border-bottom:1px solid var(--bt-border);
+  background:rgba(37,99,235,.06);
+}
+.bt-card-title { font-size:.95rem; font-weight:600; display:flex; align-items:center; gap:.5rem; }
+.bt-card-body  { padding:1.25rem 1.5rem; }
+
+/* ── Scan single user card ──────────────────────────────────────── */
+.bt-scan-form { display:flex; gap:.75rem; align-items:flex-end; flex-wrap:wrap; }
+.bt-scan-form .form-group { flex:1; min-width:180px; }
+.bt-scan-form label { display:block; font-size:.75rem; font-weight:600; margin-bottom:.4rem; color:#94a3b8; text-transform:uppercase; letter-spacing:.05em; }
+.bt-scan-form select, .bt-scan-form input {
+  width:100%; padding:.55rem .9rem; border-radius:.6rem;
+  background:rgba(15,23,42,.8); border:1px solid rgba(37,99,235,.3);
+  color:#e2e8f0; font-size:.875rem; outline:none;
+  transition:border-color .2s;
+}
+.bt-scan-form select:focus, .bt-scan-form input:focus { border-color:var(--bt-accent); }
+
+/* ── Scan result ────────────────────────────────────────────────── */
+.bt-result {
+  margin-top:1rem; border-radius:.9rem; padding:1rem 1.25rem;
+  display:flex; align-items:center; gap:1rem;
+  border:1px solid transparent; display:none;
+  animation: fadeInUp .3s ease;
+}
+.bt-result.found    { background:rgba(16,185,129,.1);  border-color:rgba(16,185,129,.3); }
+.bt-result.notfound { background:rgba(239,68,68,.1);   border-color:rgba(239,68,68,.3);  }
+.bt-result.error    { background:rgba(245,158,11,.1);  border-color:rgba(245,158,11,.3); }
+.bt-result-icon { width:40px; height:40px; border-radius:50%; display:flex; align-items:center; justify-content:center; flex-shrink:0; }
+.bt-result.found    .bt-result-icon { background:rgba(16,185,129,.2);  color:#10b981; }
+.bt-result.notfound .bt-result-icon { background:rgba(239,68,68,.2);   color:#ef4444; }
+.bt-result.error    .bt-result-icon { background:rgba(245,158,11,.2);  color:#f59e0b; }
+.bt-result-name { font-weight:700; font-size:1rem; }
+.bt-result-detail { font-size:.8rem; color:#94a3b8; margin-top:.15rem; }
+
+/* RSSI bar */
+.rssi-bar-wrap { display:flex; align-items:center; gap:.6rem; margin-top:.5rem; }
+.rssi-bar-track { flex:1; height:6px; background:rgba(255,255,255,.1); border-radius:9999px; overflow:hidden; }
+.rssi-bar-fill  { height:100%; border-radius:9999px; transition:width .6s ease; }
+.rssi-bar-fill.strong { background:linear-gradient(90deg,#10b981,#06b6d4); }
+.rssi-bar-fill.medium { background:linear-gradient(90deg,#f59e0b,#10b981); }
+.rssi-bar-fill.weak   { background:linear-gradient(90deg,#ef4444,#f59e0b); }
+.rssi-label { font-size:.75rem; color:#94a3b8; white-space:nowrap; }
+
+/* ── Users table ────────────────────────────────────────────────── */
+.bt-users-table { width:100%; border-collapse:collapse; font-size:.875rem; }
+.bt-users-table thead tr { border-bottom:1px solid rgba(37,99,235,.2); }
+.bt-users-table th { padding:.6rem 1rem; text-align:left; font-size:.7rem; font-weight:600; text-transform:uppercase; letter-spacing:.06em; color:#64748b; }
+.bt-users-table td { padding:.75rem 1rem; border-bottom:1px solid rgba(255,255,255,.04); }
+.bt-users-table tr:last-child td { border-bottom:none; }
+.bt-users-table tr:hover td { background:rgba(37,99,235,.04); }
+
+.bt-mac-cell { font-family:monospace; font-size:.8rem; color:var(--bt-accent); }
+.bt-mac-none { color:#475569; font-style:italic; font-size:.8rem; }
+
+.bt-presence { display:inline-flex; align-items:center; gap:.35rem; font-size:.75rem; font-weight:600; padding:.25rem .65rem; border-radius:9999px; }
+.bt-presence.present { background:rgba(16,185,129,.15); color:#10b981; }
+.bt-presence.absent  { background:rgba(100,116,139,.15); color:#64748b; }
+.bt-presence.unknown { background:rgba(245,158,11,.1);  color:#f59e0b; }
+
+.bt-set-btn {
+  padding:.3rem .65rem; border-radius:.45rem; border:1px solid rgba(37,99,235,.4);
+  background:rgba(37,99,235,.1); color:#93c5fd; font-size:.75rem; cursor:pointer;
+  transition:all .2s; display:inline-flex; align-items:center; gap:.3rem;
+}
+.bt-set-btn:hover { background:rgba(37,99,235,.25); border-color:var(--bt-primary); color:#fff; }
+
+/* ── Scan spinner ───────────────────────────────────────────────── */
+.bt-scanning-wrap { display:none; flex-direction:column; align-items:center; gap:.75rem; padding:1.5rem; }
+.bt-scanning-rings { position:relative; width:80px; height:80px; display:flex; align-items:center; justify-content:center; }
+.bt-scan-ring {
+  position:absolute; border-radius:50%; border:2px solid var(--bt-accent);
+  animation:scanPulse 1.4s ease-out infinite;
+}
+.bt-scan-ring:nth-child(1){ width:30px; height:30px; animation-delay:0s; }
+.bt-scan-ring:nth-child(2){ width:55px; height:55px; animation-delay:.35s; }
+.bt-scan-ring:nth-child(3){ width:80px; height:80px; animation-delay:.7s;  }
+@keyframes scanPulse {
+  0%  { opacity:0.9; transform:scale(.6); }
+  80% { opacity:0.1; transform:scale(1);  }
+  100%{ opacity:0;   }
+}
+.bt-scan-icon { position:relative; z-index:2; color:var(--bt-accent); }
+.bt-scanning-text { font-size:.875rem; color:#94a3b8; font-style:italic; }
+
+/* ── Threshold info ─────────────────────────────────────────────── */
+.bt-config-row {
+  display:flex; gap:.75rem; align-items:center; flex-wrap:wrap;
+  font-size:.8rem; color:#64748b;
+}
+.bt-config-pill {
+  display:inline-flex; align-items:center; gap:.4rem;
+  background:rgba(6,182,212,.1); border:1px solid rgba(6,182,212,.25);
+  border-radius:9999px; padding:.25rem .7rem; color:var(--bt-accent); font-size:.75rem; font-weight:600;
+}
+
+/* ── Modal ──────────────────────────────────────────────────────── */
+.bt-modal-backdrop {
+  position:fixed; inset:0; background:rgba(0,0,0,.65); backdrop-filter:blur(4px);
+  z-index:1000; display:none; align-items:center; justify-content:center;
+}
+.bt-modal-backdrop.open { display:flex; }
+.bt-modal {
+  background:#0f172a; border:1px solid rgba(37,99,235,.35);
+  border-radius:1.25rem; padding:2rem; width:420px; max-width:95vw;
+  box-shadow: 0 25px 60px rgba(0,0,0,.5);
+  animation: modalIn .25s ease;
+}
+@keyframes modalIn  { from{opacity:0;transform:translateY(-20px)} to{opacity:1;transform:none} }
+@keyframes fadeInUp { from{opacity:0;transform:translateY(8px)}   to{opacity:1;transform:none} }
+
+.bt-modal-title { font-size:1.1rem; font-weight:700; margin-bottom:1.25rem; display:flex; align-items:center; gap:.5rem; }
+.bt-modal-field { margin-bottom:1rem; }
+.bt-modal-field label { display:block; font-size:.75rem; font-weight:600; color:#94a3b8; text-transform:uppercase; letter-spacing:.05em; margin-bottom:.4rem; }
+.bt-modal-field input {
+  width:100%; padding:.6rem 1rem; border-radius:.65rem;
+  background:rgba(255,255,255,.05); border:1px solid rgba(37,99,235,.3);
+  color:#e2e8f0; font-size:.875rem; font-family:monospace; outline:none;
+  transition:border-color .2s;
+}
+.bt-modal-field input:focus { border-color:var(--bt-accent); }
+.bt-modal-hint { font-size:.75rem; color:#475569; margin-top:.3rem; }
+.bt-modal-actions { display:flex; gap:.75rem; justify-content:flex-end; margin-top:1.5rem; }
+.bt-modal-actions .btn-cancel {
+  padding:.55rem 1.25rem; border-radius:.65rem; border:1px solid rgba(255,255,255,.1);
+  background:rgba(255,255,255,.05); color:#94a3b8; cursor:pointer; font-size:.875rem; transition:all .2s;
+}
+.bt-modal-actions .btn-cancel:hover { background:rgba(255,255,255,.1); color:#fff; }
+.bt-modal-actions .btn-save {
+  padding:.55rem 1.25rem; border-radius:.65rem;
+  background:linear-gradient(135deg, var(--bt-primary), var(--bt-accent));
+  color:#fff; border:none; cursor:pointer; font-size:.875rem; font-weight:600; transition:opacity .2s;
+}
+.bt-modal-actions .btn-save:hover { opacity:.85; }
+
+/* ── Scan-all progress ──────────────────────────────────────────── */
+.scan-all-progress { display:none; padding:.75rem 1.5rem; border-top:1px solid var(--bt-border); font-size:.8rem; color:#94a3b8; }
+</style>
+
+<!-- ══════════════════════════════════════════════════════════════════ -->
+<!--  MAC Address Modal                                                -->
+<!-- ══════════════════════════════════════════════════════════════════ -->
+<div class="bt-modal-backdrop" id="macModal">
+  <div class="bt-modal" role="dialog" aria-labelledby="macModalTitle">
+    <p class="bt-modal-title">
+      <svg width="20" height="20" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2">
+        <polyline points="6.5 6.5 17.5 17.5 12 23 12 1 17.5 6.5 6.5 17.5"></polyline>
+      </svg>
+      <span id="macModalTitle">Set Bluetooth MAC</span>
+    </p>
+    <p id="macModalUserName" style="font-size:.85rem;color:#94a3b8;margin-bottom:1rem;"></p>
+
+    <div class="bt-modal-field">
+      <label for="macInput">Bluetooth MAC Address</label>
+      <input type="text" id="macInput" placeholder="AA:BB:CC:DD:EE:FF"
+             maxlength="17" autocomplete="off" spellcheck="false">
+      <p class="bt-modal-hint">Format: XX:XX:XX:XX:XX:XX (hexadecimal, colon-separated)</p>
+    </div>
+
+    <div class="bt-modal-field">
+      <label>How to find your phone's Bluetooth MAC</label>
+      <p class="bt-modal-hint" style="margin-top:0">
+        <strong>Android:</strong> Settings → About Phone → Status → Bluetooth Address<br>
+        <strong>Note:</strong> iOS 14+ randomises BLE MAC. Use Android phones for reliable proximity detection.
+      </p>
+    </div>
+
+    <div class="bt-modal-actions">
+      <button class="btn-cancel" onclick="closeMacModal()">Cancel</button>
+      <button class="btn-save"   onclick="saveMac()">
+        <svg width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.5">
+          <polyline points="20 6 9 17 4 12"></polyline>
+        </svg>
+        Save MAC
+      </button>
+    </div>
+  </div>
+</div>
+
+<!-- ══════════════════════════════════════════════════════════════════ -->
+<!--  Main layout                                                      -->
+<!-- ══════════════════════════════════════════════════════════════════ -->
+<div class="bt-layout">
+
+  <!-- ── Left: hero signal card ────────────────────────────────────── -->
+  <div class="bt-hero-card">
+    <div class="bt-signal-wrap">
+      <div class="bt-ring"></div>
+      <div class="bt-ring"></div>
+      <div class="bt-ring"></div>
+      <div class="bt-ring"></div>
+      <div class="bt-icon-center">
+        <svg width="26" height="26" viewBox="0 0 24 24" fill="none" stroke="white" stroke-width="2.5">
+          <polyline points="6.5 6.5 17.5 17.5 12 23 12 1 17.5 6.5 6.5 17.5"></polyline>
+        </svg>
+      </div>
+    </div>
+
+    <div style="text-align:center">
+      <p style="font-size:1.1rem;font-weight:700;margin-bottom:.35rem">Bluetooth Proximity 2FA</p>
+      <p style="font-size:.8rem;color:#64748b;line-height:1.5">
+        Scans for registered phones via Bluetooth Low Energy (BLE) before allowing face authentication.
+      </p>
+    </div>
+
+    <span class="bt-status-badge {{ 'available' if bleak_available else 'unavailable' }}">
+      <span style="width:7px;height:7px;border-radius:50%;background:currentColor;display:inline-block"></span>
+      {% if bleak_available %}BLE Scanner Ready{% else %}Scanner Unavailable{% endif %}
+    </span>
+
+    {% if not bleak_available %}
+    <div style="background:rgba(239,68,68,.08);border:1px solid rgba(239,68,68,.25);border-radius:.75rem;padding:.9rem;font-size:.78rem;color:#f87171;line-height:1.6;width:100%">
+      <strong>Action required:</strong><br>
+      Run <code style="background:rgba(0,0,0,.3);padding:.1rem .35rem;border-radius:.3rem">pip install bleak</code>
+      then restart the server.
+    </div>
+    {% endif %}
+
+    <div class="bt-stats-row">
+      <div class="bt-stat-box">
+        <div class="bt-stat-val" id="statTotal">{{ users|length }}</div>
+        <div class="bt-stat-lbl">Total Users</div>
+      </div>
+      <div class="bt-stat-box">
+        <div class="bt-stat-val" id="statRegistered">{{ users|selectattr('bluetooth_mac')|list|length }}</div>
+        <div class="bt-stat-lbl">BT Registered</div>
+      </div>
+      <div class="bt-stat-box">
+        <div class="bt-stat-val" id="statPresent">—</div>
+        <div class="bt-stat-lbl">Nearby</div>
+      </div>
+    </div>
+
+    <div class="bt-config-row" style="width:100%">
+      <span>Threshold:</span>
+      <span class="bt-config-pill">
+        <svg width="12" height="12" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2">
+          <path d="M22 16.92v3a2 2 0 0 1-2.18 2 19.79 19.79 0 0 1-8.63-3.07A19.5 19.5 0 0 1 4.69 13a19.79 19.79 0 0 1-3.07-8.67A2 2 0 0 1 3.6 2.22h3a2 2 0 0 1 2 1.72c.127.96.361 1.903.7 2.81a2 2 0 0 1-.45 2.11L7.91 9.91a16 16 0 0 0 6 6l.91-.91a2 2 0 0 1 2.11-.45c.907.339 1.85.573 2.81.7A2 2 0 0 1 21.73 17z"/>
+        </svg>
+        RSSI ≥ {{ rssi_threshold }} dBm
+      </span>
+      <span class="bt-config-pill">
+        <svg width="12" height="12" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2">
+          <circle cx="12" cy="12" r="10"/><polyline points="12 6 12 12 16 14"/>
+        </svg>
+        {{ scan_duration }}s scan
+      </span>
+    </div>
+
+    <button class="btn btn-primary" style="width:100%" onclick="scanAll()" id="btnScanAll">
+      <svg width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2">
+        <polyline points="6.5 6.5 17.5 17.5 12 23 12 1 17.5 6.5 6.5 17.5"></polyline>
+      </svg>
+      Scan All Registered
+    </button>
+  </div>
+
+  <!-- ── Right panel ────────────────────────────────────────────────── -->
+  <div class="bt-right-panel">
+
+    <!-- Single user proximity check -->
+    <div class="bt-card">
+      <div class="bt-card-header">
+        <span class="bt-card-title">
+          <svg width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2">
+            <circle cx="11" cy="11" r="8"/><path d="m21 21-4.35-4.35"/>
+          </svg>
+          Proximity Check
+        </span>
+      </div>
+      <div class="bt-card-body">
+        <div class="bt-scan-form">
+          <div class="form-group">
+            <label>Select User</label>
+            <select id="scanUserSelect">
+              <option value="">— Choose user —</option>
+              {% for user in users %}
+              <option value="{{ user.id }}"
+                data-mac="{{ user.bluetooth_mac or '' }}"
+                data-name="{{ user.full_name|e }}">
+                {{ user.full_name }} ({{ user.username }})
+                {% if not user.bluetooth_mac %}— No MAC{% endif %}
+              </option>
+              {% endfor %}
+            </select>
+          </div>
+          <button class="btn btn-primary" id="btnCheck" onclick="checkProximity()" style="white-space:nowrap">
+            <svg width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2">
+              <polyline points="6.5 6.5 17.5 17.5 12 23 12 1 17.5 6.5 6.5 17.5"></polyline>
+            </svg>
+            Check Proximity
+          </button>
+        </div>
+
+        <!-- Scanning animation -->
+        <div class="bt-scanning-wrap" id="scanningWrap">
+          <div class="bt-scanning-rings">
+            <div class="bt-scan-ring"></div>
+            <div class="bt-scan-ring"></div>
+            <div class="bt-scan-ring"></div>
+            <div class="bt-scan-icon">
+              <svg width="20" height="20" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2">
+                <polyline points="6.5 6.5 17.5 17.5 12 23 12 1 17.5 6.5 6.5 17.5"></polyline>
+              </svg>
+            </div>
+          </div>
+          <p class="bt-scanning-text" id="scanningText">Scanning for device…</p>
+        </div>
+
+        <!-- Result -->
+        <div class="bt-result" id="singleResult">
+          <div class="bt-result-icon" id="singleResultIcon"></div>
+          <div>
+            <p class="bt-result-name" id="singleResultName"></p>
+            <p class="bt-result-detail" id="singleResultDetail"></p>
+            <div class="rssi-bar-wrap" id="rssiBarWrap" style="display:none">
+              <span class="rssi-label" id="rssiLabel"></span>
+              <div class="rssi-bar-track">
+                <div class="rssi-bar-fill" id="rssiBarFill" style="width:0%"></div>
+              </div>
+              <span class="rssi-label" id="rssiDbm"></span>
+            </div>
+          </div>
+        </div>
+      </div>
+    </div>
+
+    <!-- Users table -->
+    <div class="bt-card">
+      <div class="bt-card-header">
+        <span class="bt-card-title">
+          <svg width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2">
+            <path d="M20 21v-2a4 4 0 0 0-4-4H8a4 4 0 0 0-4 4v2"/><circle cx="12" cy="7" r="4"/>
+          </svg>
+          Registered Users
+        </span>
+        <span style="font-size:.75rem;color:#64748b" id="scanProgress"></span>
+      </div>
+      <div style="overflow-x:auto">
+        <table class="bt-users-table">
+          <thead>
+            <tr>
+              <th>User</th>
+              <th>Username</th>
+              <th>Role</th>
+              <th>BT MAC Address</th>
+              <th>Proximity</th>
+              <th>Action</th>
+            </tr>
+          </thead>
+          <tbody id="btUsersTableBody">
+            {% for user in users %}
+            <tr id="btRow-{{ user.id }}">
+              <td>
+                <div style="display:flex;align-items:center;gap:.6rem">
+                  {% if user.photo_path %}
+                  <img src="{{ url_for('uploaded_file', filename=user.photo_path) }}"
+                       alt="{{ user.full_name }}" style="width:32px;height:32px;border-radius:50%;object-fit:cover">
+                  {% else %}
+                  <div style="width:32px;height:32px;border-radius:50%;background:linear-gradient(135deg,#2563eb,#06b6d4);display:flex;align-items:center;justify-content:center;font-size:.8rem;font-weight:700;color:#fff">
+                    {{ user.full_name[0]|upper }}
+                  </div>
+                  {% endif %}
+                  <span style="font-weight:600;font-size:.875rem">{{ user.full_name }}</span>
+                </div>
+              </td>
+              <td style="color:#94a3b8;font-family:monospace;font-size:.8rem">{{ user.username }}</td>
+              <td>
+                <span style="font-size:.7rem;font-weight:600;padding:.2rem .55rem;border-radius:9999px;background:rgba(37,99,235,.12);color:#93c5fd">
+                  {{ user.role }}
+                </span>
+              </td>
+              <td class="bt-mac-cell" id="macCell-{{ user.id }}">
+                {% if user.bluetooth_mac %}
+                  <code>{{ user.bluetooth_mac }}</code>
+                {% else %}
+                  <span class="bt-mac-none">Not set</span>
+                {% endif %}
+              </td>
+              <td id="presenceCell-{{ user.id }}">
+                <span class="bt-presence unknown">
+                  <svg width="8" height="8" viewBox="0 0 8 8"><circle cx="4" cy="4" r="4" fill="currentColor"/></svg>
+                  Unknown
+                </span>
+              </td>
+              <td>
+                <button class="bt-set-btn"
+                        data-id="{{ user.id }}"
+                        data-fullname="{{ user.full_name|e }}"
+                        data-mac="{{ user.bluetooth_mac or '' }}"
+                        onclick="openMacModal(this)"
+                        title="Set Bluetooth MAC">
+                  <svg width="12" height="12" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2">
+                    <path d="M11 4H4a2 2 0 0 0-2 2v14a2 2 0 0 0 2 2h14a2 2 0 0 0 2-2v-7"/>
+                    <path d="M18.5 2.5a2.121 2.121 0 0 1 3 3L12 15l-4 1 1-4 9.5-9.5z"/>
+                  </svg>
+                  Set MAC
+                </button>
+              </td>
+            </tr>
+            {% endfor %}
+          </tbody>
+        </table>
+      </div>
+      <div class="scan-all-progress" id="scanAllProgress"></div>
+    </div>
+  </div><!-- /bt-right-panel -->
+</div><!-- /bt-layout -->
+
+
+<script>
+/* ── State ──────────────────────────────────────────────────────── */
+const CSRF_TOKEN = '{{ csrf_token() }}';
+let currentModalUserId = null;
+
+/* ── Toast helper ───────────────────────────────────────────────── */
+function showToast(msg, type='info') {
+  const t = document.getElementById('btToast') || createToast();
+  t.textContent = msg;
+  t.className = `bt-toast bt-toast-${type}`;
+  t.style.opacity = '1';
+  setTimeout(() => { t.style.opacity = '0'; }, 3500);
+}
+function createToast() {
+  const t = document.createElement('div');
+  t.id = 'btToast';
+  Object.assign(t.style, {
+    position:'fixed', bottom:'1.5rem', right:'1.5rem', zIndex:'9999',
+    padding:'.75rem 1.25rem', borderRadius:'.75rem', fontSize:'.875rem',
+    background:'#1e293b', color:'#e2e8f0', border:'1px solid rgba(255,255,255,.1)',
+    transition:'opacity .4s', opacity:'0', maxWidth:'320px', lineHeight:'1.4'
+  });
+  document.body.appendChild(t);
+  return t;
+}
+
+/* ── MAC Modal ──────────────────────────────────────────────────── */
+function openMacModal(btn) {
+  const userId = btn.dataset.id;
+  const fullName = btn.dataset.fullname;
+  const currentMac = btn.dataset.mac;
+
+  currentModalUserId = userId;
+  document.getElementById('macModalTitle').textContent = 'Set Bluetooth MAC — ' + fullName;
+  document.getElementById('macModalUserName').textContent =
+    "Enter the phone's Bluetooth MAC address for " + fullName;
+  document.getElementById('macInput').value = currentMac || '';
+  document.getElementById('macModal').classList.add('open');
+  document.getElementById('macInput').focus();
+}
+
+function closeMacModal() {
+  document.getElementById('macModal').classList.remove('open');
+  currentModalUserId = null;
+}
+
+document.getElementById('macModal').addEventListener('click', function(e) {
+  if (e.target === this) closeMacModal();
+});
+
+// Auto-format MAC as user types
+document.getElementById('macInput').addEventListener('input', function() {
+  let v = this.value.replace(/[^0-9A-Fa-f]/g, '').toUpperCase();
+  let formatted = v.match(/.{1,2}/g)?.join(':') || '';
+  if (formatted.length > 17) formatted = formatted.slice(0, 17);
+  this.value = formatted;
+});
+
+async function saveMac() {
+  if (!currentModalUserId) return;
+  const mac = document.getElementById('macInput').value.trim();
+
+  // Validate format (allow empty to clear)
+  if (mac && !/^([0-9A-F]{2}:){5}[0-9A-F]{2}$/.test(mac)) {
+    showToast('Invalid MAC format. Use XX:XX:XX:XX:XX:XX', 'error');
+    return;
+  }
+
+  try {
+    const resp = await fetch(`/users/${currentModalUserId}/bluetooth`, {
+      method:'POST',
+      headers:{'Content-Type':'application/json','X-CSRFToken':CSRF_TOKEN},
+      body: JSON.stringify({ mac })
+    });
+    const data = await resp.json();
+    if (!data.success) throw new Error(data.error || 'Save failed');
+
+    // Update table cell in-place
+    const cell = document.getElementById(`macCell-${currentModalUserId}`);
+    if (mac) {
+      cell.innerHTML = `<code>${mac}</code>`;
+    } else {
+      cell.innerHTML = '<span class="bt-mac-none">Not set</span>';
+    }
+
+    // Update stat counter
+    const registered = document.querySelectorAll('[id^="macCell-"] code').length;
+    document.getElementById('statRegistered').textContent = registered;
+
+    // Reset presence for this row
+    updatePresenceCell(currentModalUserId, 'unknown', null);
+
+    // Update dropdown option
+    const opt = document.querySelector(`#scanUserSelect option[value="${currentModalUserId}"]`);
+    if (opt) {
+      opt.dataset.mac = mac;
+      const name = opt.dataset.name;
+      opt.textContent = `${name} (${opt.textContent.split('(')[1].split(')')[0]})` + (mac ? '' : '— No MAC');
+    }
+
+    showToast(mac ? `MAC saved: ${mac}` : 'MAC address cleared', 'success');
+    closeMacModal();
+  } catch(err) {
+    showToast('Error: ' + err.message, 'error');
+  }
+}
+
+/* ── Proximity check (single user) ─────────────────────────────── */
+async function checkProximity() {
+  const sel    = document.getElementById('scanUserSelect');
+  const userId = sel.value;
+  if (!userId) { showToast('Please select a user first', 'info'); return; }
+
+  const btn          = document.getElementById('btnCheck');
+  const scanningWrap = document.getElementById('scanningWrap');
+  const result       = document.getElementById('singleResult');
+  const scanText     = document.getElementById('scanningText');
+  const selectedOption = sel.options[sel.selectedIndex];
+
+  btn.disabled = true;
+  result.style.display    = 'none';
+  scanningWrap.style.display = 'flex';
+  scanText.textContent = `Scanning for ${selectedOption.dataset.name}…`;
+
+  try {
+    const resp = await fetch('/bluetooth/check', {
+      method:'POST',
+      headers:{'Content-Type':'application/json','X-CSRFToken':CSRF_TOKEN},
+      body: JSON.stringify({ user_id: userId })
+    });
+    const data = await resp.json();
+
+    scanningWrap.style.display = 'none';
+    showSingleResult(data);
+
+  } catch(err) {
+    scanningWrap.style.display = 'none';
+    showSingleResult({ found:false, message:'Network error: '+err.message });
+  } finally {
+    btn.disabled = false;
+  }
+}
+
+function showSingleResult(data) {
+  const box    = document.getElementById('singleResult');
+  const icon   = document.getElementById('singleResultIcon');
+  const name   = document.getElementById('singleResultName');
+  const detail = document.getElementById('singleResultDetail');
+  const rssiWrap = document.getElementById('rssiBarWrap');
+  // Always resolve userId from the select (data.user_id is not sent by the API)
+  const userId = document.getElementById('scanUserSelect').value;
+
+  box.style.display = 'flex';
+
+  if (!data.success && data.error) {
+    box.className = 'bt-result error';
+    icon.innerHTML = warnIcon();
+    name.textContent   = 'Error';
+    detail.textContent = data.error || data.message;
+    rssiWrap.style.display = 'none';
+    return;
+  }
+
+  if (data.found) {
+    box.className = 'bt-result found';
+    icon.innerHTML = checkIcon();
+    name.textContent   = `${data.full_name} — Phone Detected`;
+    detail.textContent = data.message;
+    if (data.rssi !== null && data.rssi !== undefined) {
+      rssiWrap.style.display = 'flex';
+      renderRssiBar(data.rssi);
+    } else {
+      rssiWrap.style.display = 'none';
+    }
+    updatePresenceCell(userId, 'present', data.rssi);
+  } else {
+    box.className = 'bt-result notfound';
+    icon.innerHTML = crossIcon();
+    name.textContent   = data.full_name
+      ? `${data.full_name} — Phone Not Found`
+      : 'Phone Not Found';
+    detail.textContent = data.message;
+    if (data.rssi !== null && data.rssi !== undefined) {
+      rssiWrap.style.display = 'flex';
+      renderRssiBar(data.rssi);
+    } else {
+      rssiWrap.style.display = 'none';
+    }
+    // Update the table row to show "Not Detected" (was missing before)
+    updatePresenceCell(userId, 'absent', data.rssi);
+  }
+}
+
+function renderRssiBar(rssi) {
+  const label   = document.getElementById('rssiLabel');
+  const fill    = document.getElementById('rssiBarFill');
+  const dbmSpan = document.getElementById('rssiDbm');
+
+  // Map RSSI -30 (max) to -100 (min) → 100% to 0%
+  const pct  = Math.min(100, Math.max(0, ((rssi + 100) / 70) * 100));
+  fill.style.width = pct + '%';
+  fill.className   = 'rssi-bar-fill ' + (pct >= 60 ? 'strong' : pct >= 35 ? 'medium' : 'weak');
+  label.textContent = 'Signal';
+  dbmSpan.textContent = `${rssi} dBm`;
+}
+
+/* ── Scan All ───────────────────────────────────────────────────── */
+async function scanAll() {
+  const btn = document.getElementById('btnScanAll');
+  const prog = document.getElementById('scanProgress');
+  const scanAllProg = document.getElementById('scanAllProgress');
+
+  btn.disabled = true;
+  prog.textContent = 'Scanning…';
+  scanAllProg.style.display = 'block';
+  scanAllProg.textContent   = '⚡ BLE scan running… please wait.';
+
+  try {
+    const resp = await fetch('/bluetooth/scan-all', {
+      method:'POST',
+      headers:{'Content-Type':'application/json','X-CSRFToken':CSRF_TOKEN},
+      body: '{}'
+    });
+    const data = await resp.json();
+    if (!data.success) throw new Error(data.error || 'Scan failed');
+
+    let presentCount = 0;
+    data.results.forEach(r => {
+      updatePresenceCell(r.user_id, r.found ? 'present' : 'absent', r.rssi);
+      if (r.found) presentCount++;
+    });
+
+    document.getElementById('statPresent').textContent = presentCount;
+    prog.textContent = `Done — ${presentCount} / ${data.results.length} nearby`;
+    scanAllProg.textContent = `Scan complete: ${presentCount} of ${data.results.length} registered devices detected.`;
+    setTimeout(() => { scanAllProg.style.display = 'none'; }, 5000);
+    showToast(`Scan complete: ${presentCount} nearby`, 'success');
+
+  } catch(err) {
+    prog.textContent = 'Scan failed';
+    scanAllProg.textContent = 'Error: ' + err.message;
+    showToast('Scan error: ' + err.message, 'error');
+  } finally {
+    btn.disabled = false;
+  }
+}
+
+/* ── Presence cell helper ───────────────────────────────────────── */
+function updatePresenceCell(userId, state, rssi) {
+  const cell = document.getElementById(`presenceCell-${userId}`);
+  if (!cell) return;
+  const rssiStr = (rssi !== null && rssi !== undefined) ? ` (${rssi} dBm)` : '';
+  if (state === 'present') {
+    cell.innerHTML = `<span class="bt-presence present">
+      <svg width="8" height="8" viewBox="0 0 8 8"><circle cx="4" cy="4" r="4" fill="currentColor"/></svg>
+      Nearby${rssiStr}</span>`;
+  } else if (state === 'absent') {
+    cell.innerHTML = `<span class="bt-presence absent">
+      <svg width="8" height="8" viewBox="0 0 8 8"><circle cx="4" cy="4" r="4" fill="currentColor"/></svg>
+      Not Detected</span>`;
+  } else {
+    cell.innerHTML = `<span class="bt-presence unknown">
+      <svg width="8" height="8" viewBox="0 0 8 8"><circle cx="4" cy="4" r="4" fill="currentColor"/></svg>
+      Unknown</span>`;
+  }
+}
+
+/* ── SVG icon helpers ───────────────────────────────────────────── */
+function checkIcon() {
+  return `<svg width="22" height="22" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.5">
+    <polyline points="20 6 9 17 4 12"></polyline></svg>`;
+}
+function crossIcon() {
+  return `<svg width="22" height="22" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.5">
+    <line x1="18" y1="6" x2="6" y2="18"/><line x1="6" y1="6" x2="18" y2="18"/></svg>`;
+}
+function warnIcon() {
+  return `<svg width="22" height="22" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.5">
+    <circle cx="12" cy="12" r="10"/><line x1="12" y1="8" x2="12" y2="12"/>
+    <line x1="12" y1="16" x2="12.01" y2="16"/></svg>`;
+}
+</script>
+{% endblock %}

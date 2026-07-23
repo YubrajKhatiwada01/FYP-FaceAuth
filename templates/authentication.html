@@ -2,15 +2,149 @@
 
 {% block title %}FaceAuth | Face Authentication{% endblock %}
 {% block dashboard_title %}Face Authentication{% endblock %}
-{% block dashboard_subtitle %}Live camera facial recognition and access verification{% endblock %}
+{% block dashboard_subtitle %}Bluetooth proximity verification + live facial recognition{% endblock %}
 {% block dashboard_notifications_count %}0{% endblock %}
 
 {% block dashboard_content %}
 
-<!-- ── Layout: camera feed left, controls right ─────────────────────────── -->
+<style>
+/* ── Bluetooth 2FA Gate Styles ─────────────────────────────────── */
+:root {
+  --bt-primary: #2563eb;
+  --bt-accent:  #06b6d4;
+  --bt-success: #10b981;
+  --bt-danger:  #ef4444;
+  --bt-warning: #f59e0b;
+}
+
+/* Step indicator banner */
+.auth-steps {
+  display:flex; align-items:center; gap:.5rem; margin-bottom:1.5rem;
+  padding:.75rem 1.25rem; background:rgba(15,23,42,.6);
+  border:1px solid rgba(37,99,235,.2); border-radius:.9rem;
+}
+.auth-step {
+  display:flex; align-items:center; gap:.45rem;
+  font-size:.78rem; font-weight:600; color:#64748b; transition:color .3s;
+}
+.auth-step.active { color:#06b6d4; }
+.auth-step.done   { color:#10b981; }
+.auth-step-num {
+  width:22px; height:22px; border-radius:50%; display:inline-flex;
+  align-items:center; justify-content:center; font-size:.7rem; font-weight:700;
+  border:2px solid currentColor; transition:all .3s;
+}
+.auth-step.done .auth-step-num { background:#10b981; color:#fff; border-color:#10b981; }
+.auth-step.active .auth-step-num { background:rgba(6,182,212,.2); border-color:#06b6d4; color:#06b6d4; }
+.auth-step-sep { flex:1; height:1px; background:rgba(255,255,255,.07); }
+
+/* BT gate card */
+.bt-gate-card {
+  background:rgba(15,23,42,.75);
+  border:1px solid rgba(37,99,235,.25);
+  border-radius:1rem; padding:1.25rem;
+  margin-bottom:1rem; transition:border-color .3s;
+}
+.bt-gate-card.verified { border-color:rgba(16,185,129,.4); background:rgba(16,185,129,.05); }
+.bt-gate-card.denied   { border-color:rgba(239,68,68,.4);  background:rgba(239,68,68,.05);  }
+
+.bt-gate-title {
+  font-size:.85rem; font-weight:600; display:flex; align-items:center; gap:.5rem;
+  margin-bottom:.9rem; color:#94a3b8;
+}
+.bt-gate-title svg { color:var(--bt-accent); }
+
+.bt-gate-row { display:flex; gap:.65rem; align-items:flex-end; flex-wrap:wrap; }
+.bt-gate-row .form-group { flex:1; min-width:160px; }
+
+/* Mini signal rings */
+.bt-mini-signal {
+  position:relative; width:36px; height:36px; flex-shrink:0;
+  display:flex; align-items:center; justify-content:center;
+}
+.bt-mini-ring {
+  position:absolute; border-radius:50%;
+  border:1.5px solid var(--bt-accent);
+  opacity:0;
+}
+.bt-mini-ring:nth-child(1){ width:14px; height:14px; }
+.bt-mini-ring:nth-child(2){ width:26px; height:26px; }
+.bt-mini-ring:nth-child(3){ width:38px; height:38px; }
+.bt-mini-signal.scanning .bt-mini-ring { animation:btMiniPulse 1.4s ease-out infinite; }
+.bt-mini-signal.scanning .bt-mini-ring:nth-child(2){ animation-delay:.35s; }
+.bt-mini-signal.scanning .bt-mini-ring:nth-child(3){ animation-delay:.7s; }
+@keyframes btMiniPulse {
+  0%  { opacity:.8; transform:scale(.5); }
+  80% { opacity:.1; transform:scale(1);  }
+  100%{ opacity:0;  }
+}
+
+.bt-gate-result {
+  display:none; align-items:center; gap:.65rem; padding:.65rem .9rem;
+  border-radius:.65rem; margin-top:.75rem; font-size:.82rem;
+  animation:fadeInUp .3s ease;
+}
+.bt-gate-result.ok  { background:rgba(16,185,129,.12); border:1px solid rgba(16,185,129,.3); color:#10b981; }
+.bt-gate-result.err { background:rgba(239,68,68,.12);  border:1px solid rgba(239,68,68,.3);  color:#ef4444; }
+.bt-gate-result.warn{ background:rgba(245,158,11,.12); border:1px solid rgba(245,158,11,.3); color:#f59e0b; }
+
+/* RSSI inline pill */
+.rssi-pill {
+  display:inline-flex; align-items:center; gap:.3rem;
+  background:rgba(6,182,212,.1); border:1px solid rgba(6,182,212,.25);
+  color:#06b6d4; border-radius:9999px; padding:.15rem .55rem; font-size:.72rem; font-weight:600;
+}
+
+/* Granted user display */
+.granted-user-box {
+  display:none; text-align:center; padding:1.5rem 1rem;
+  background:rgba(16,185,129,.08); border:1px solid rgba(16,185,129,.3);
+  border-radius:1rem; animation:fadeInUp .4s ease;
+}
+.granted-user-avatar {
+  width:64px; height:64px; border-radius:50%; margin:0 auto .75rem;
+  background:linear-gradient(135deg,#10b981,#06b6d4);
+  display:flex; align-items:center; justify-content:center;
+  font-size:1.75rem; font-weight:700; color:#fff;
+  box-shadow:0 0 28px rgba(16,185,129,.5);
+}
+.granted-user-name { font-size:1.3rem; font-weight:700; color:#10b981; }
+.granted-user-sub  { font-size:.8rem; color:#64748b; margin-top:.25rem; }
+
+@keyframes fadeInUp { from{opacity:0;transform:translateY(8px)} to{opacity:1;transform:none} }
+</style>
+
+<!-- ── Step Indicator ──────────────────────────────────────────────── -->
+<div class="auth-steps" id="authSteps">
+  <div class="auth-step active" id="step1">
+    <span class="auth-step-num">1</span>
+    <svg width="13" height="13" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2">
+      <polyline points="6.5 6.5 17.5 17.5 12 23 12 1 17.5 6.5 6.5 17.5"></polyline>
+    </svg>
+    Bluetooth Check
+  </div>
+  <div class="auth-step-sep"></div>
+  <div class="auth-step" id="step2">
+    <span class="auth-step-num">2</span>
+    <svg width="13" height="13" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2">
+      <path d="M1 12s4-8 11-8 11 8 11 8-4 8-11 8-11-8-11-8z"/><circle cx="12" cy="12" r="3"/>
+    </svg>
+    Face Scan
+  </div>
+  <div class="auth-step-sep"></div>
+  <div class="auth-step" id="step3">
+    <span class="auth-step-num">3</span>
+    <svg width="13" height="13" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2">
+      <polyline points="20 6 9 17 4 12"></polyline>
+    </svg>
+    Access Decision
+  </div>
+</div>
+
+<!-- ── Layout: camera feed left, controls right ─────────────────────── -->
 <div class="auth-layout">
 
-  <!-- ── Left: Camera panel ─────────────────────────────────────────────── -->
+  <!-- ── Left: Camera panel ─────────────────────────────────────────── -->
   <div class="camera-panel">
 
     <!-- Status bar above the feed -->
@@ -45,7 +179,7 @@
           </svg>
         </div>
         <p class="cam-placeholder-title">Camera not started</p>
-        <p class="cam-placeholder-sub">Click <strong>Start Camera</strong> to begin live scanning</p>
+        <p class="cam-placeholder-sub">Complete <strong>Step 1</strong> (Bluetooth check) first, then start camera</p>
       </div>
 
       <!-- Video element — hidden until camera is active -->
@@ -75,17 +209,58 @@
   </div><!-- /camera-panel -->
 
 
-  <!-- ── Right: Controls & result panel ────────────────────────────────── -->
+  <!-- ── Right: Controls & result panel ────────────────────────────── -->
   <div class="auth-controls">
 
-    <!-- Camera controls card -->
-    <div class="auth-card">
+    <!-- ── STEP 1: Bluetooth Proximity Gate ──────────────────────── -->
+    <div class="bt-gate-card" id="btGateCard">
+      <div class="bt-gate-title">
+        <svg width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2">
+          <polyline points="6.5 6.5 17.5 17.5 12 23 12 1 17.5 6.5 6.5 17.5"></polyline>
+        </svg>
+        Step 1 — Bluetooth Proximity Check
+      </div>
+
+      <div class="bt-gate-row">
+        <div class="form-group">
+          <label class="form-label">Identify User</label>
+          <select id="btUserSelect" class="form-select" onchange="onUserSelect()">
+            <option value="">— Select user to authenticate —</option>
+            {% for user in users %}
+            {% if user.status == 'Active' %}
+            <option value="{{ user.id }}"
+              data-name="{{ user.full_name|e }}"
+              data-mac="{{ user.bluetooth_mac or '' }}">
+              {{ user.full_name }} ({{ user.username }})
+            </option>
+            {% endif %}
+            {% endfor %}
+          </select>
+        </div>
+        <div class="bt-mini-signal" id="btMiniSignal">
+          <div class="bt-mini-ring"></div>
+          <div class="bt-mini-ring"></div>
+          <div class="bt-mini-ring"></div>
+          <svg width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" style="position:relative;z-index:2;color:#06b6d4">
+            <polyline points="6.5 6.5 17.5 17.5 12 23 12 1 17.5 6.5 6.5 17.5"></polyline>
+          </svg>
+        </div>
+        <button class="btn btn-primary" id="btnBtCheck" onclick="runBtCheck()" disabled>
+          Check
+        </button>
+      </div>
+
+      <div class="bt-gate-result" id="btGateResult"></div>
+    </div>
+
+    <!-- ── STEP 2: Camera Controls ──────────────────────────────── -->
+    <div class="auth-card" id="cameraControlCard" style="opacity:.45;pointer-events:none;transition:all .4s">
       <h3 class="auth-card-title">
         <svg width="18" height="18" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2">
           <circle cx="12" cy="12" r="3"></circle>
           <path d="M12 1v4M12 19v4M4.22 4.22l2.83 2.83M16.95 16.95l2.83 2.83M1 12h4M19 12h4M4.22 19.78l2.83-2.83M16.95 7.05l2.83-2.83"></path>
         </svg>
-        Camera Controls
+        Step 2 — Camera Controls
       </h3>
 
       <!-- Device selector -->
@@ -123,14 +298,14 @@
       </div>
     </div>
 
-    <!-- Scan / recognition card -->
-    <div class="auth-card">
+    <!-- ── STEP 3: Face Scan ─────────────────────────────────────── -->
+    <div class="auth-card" id="faceScanCard" style="opacity:.45;pointer-events:none;transition:all .4s">
       <h3 class="auth-card-title">
         <svg width="18" height="18" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2">
           <path d="M1 12s4-8 11-8 11 8 11 8-4 8-11 8-11-8-11-8z"></path>
           <circle cx="12" cy="12" r="3"></circle>
         </svg>
-        Face Scan
+        Step 3 — Face Scan
       </h3>
 
       <!-- Access point selector -->
@@ -138,7 +313,6 @@
         <label class="form-label">Access Point</label>
         <select id="accessPointSelect" class="form-select">
           <option value="Camera Station">Camera Station</option>
-          {% for ap in users %}{% endfor %}{# placeholder — access points passed via dedicated query #}
           <option value="Main Entry">Main Entry</option>
           <option value="Conference Room">Conference Room</option>
           <option value="Server Room">Server Room</option>
@@ -155,6 +329,13 @@
         </svg>
         Scan Face
       </button>
+
+      <!-- Granted user display -->
+      <div class="granted-user-box" id="grantedUserBox">
+        <div class="granted-user-avatar" id="grantedUserAvatar"></div>
+        <p class="granted-user-name" id="grantedUserName"></p>
+        <p class="granted-user-sub" id="grantedUserSub"></p>
+      </div>
 
       <!-- Result display -->
       <div class="auth-result" id="authResult" style="display:none">
@@ -184,14 +365,17 @@
 </div><!-- /auth-layout -->
 
 
-<!-- ══════════════════════════════════════════════════════════════════════
+<!-- ══════════════════════════════════════════════════════════════════
      JAVASCRIPT
-     ══════════════════════════════════════════════════════════════════════ -->
+     ══════════════════════════════════════════════════════════════════ -->
 <script>
 /* ── State ──────────────────────────────────────────────────────────────── */
-let stream        = null;
-let animFrame     = null;
-let snapshotCount = 0;
+const CSRF_TOKEN   = '{{ csrf_token() }}';
+let stream         = null;
+let animFrame      = null;
+let snapshotCount  = 0;
+let btVerified     = false;          // true once BT proximity check passes
+let btVerifiedUser = null;           // {user_id, username, full_name}
 
 const video       = document.getElementById('cameraFeed');
 const canvas      = document.getElementById('scanOverlay');
@@ -204,9 +388,171 @@ window.addEventListener('DOMContentLoaded', async () => {
   await enumerateDevices();
 });
 
+/* ── Step indicator helpers ─────────────────────────────────────────────── */
+function setStep(active) {
+  // active: 1, 2, or 3
+  [1,2,3].forEach(n => {
+    const el = document.getElementById(`step${n}`);
+    el.classList.remove('active','done');
+    if (n < active)  el.classList.add('done');
+    if (n === active) el.classList.add('active');
+  });
+}
+
+function unlockCameraControls(unlock) {
+  const cameraCard = document.getElementById('cameraControlCard');
+  const faceCard   = document.getElementById('faceScanCard');
+  if (unlock) {
+    cameraCard.style.opacity = '1';
+    cameraCard.style.pointerEvents = 'auto';
+  }
+}
+
+function unlockFaceScan(unlock) {
+  const faceCard = document.getElementById('faceScanCard');
+  if (unlock) {
+    faceCard.style.opacity = '1';
+    faceCard.style.pointerEvents = 'auto';
+    setStep(2);
+  }
+}
+
+/* ── User selector change ───────────────────────────────────────────────── */
+function onUserSelect() {
+  const sel = document.getElementById('btUserSelect');
+  const btn = document.getElementById('btnBtCheck');
+  btn.disabled = !sel.value;
+
+  // Reset verification if user changes
+  if (btVerified) {
+    btVerified = false;
+    btVerifiedUser = null;
+    resetBtGate();
+  }
+}
+
+function resetBtGate() {
+  document.getElementById('btGateCard').className = 'bt-gate-card';
+  document.getElementById('btGateResult').style.display = 'none';
+  document.getElementById('btMiniSignal').classList.remove('scanning');
+  // Lock camera & face scan cards again
+  document.getElementById('cameraControlCard').style.opacity = '0.45';
+  document.getElementById('cameraControlCard').style.pointerEvents = 'none';
+  document.getElementById('faceScanCard').style.opacity = '0.45';
+  document.getElementById('faceScanCard').style.pointerEvents = 'none';
+  document.getElementById('btnScan').disabled = true;
+  setStep(1);
+}
+
+/* ── Bluetooth proximity check ──────────────────────────────────────────── */
+async function runBtCheck() {
+  const sel    = document.getElementById('btUserSelect');
+  const userId = sel.value;
+  if (!userId) return;
+
+  const btn      = document.getElementById('btnBtCheck');
+  const signal   = document.getElementById('btMiniSignal');
+  const resultEl = document.getElementById('btGateResult');
+  const card     = document.getElementById('btGateCard');
+
+  btn.disabled = true;
+  signal.classList.add('scanning');
+  resultEl.style.display = 'none';
+  card.className = 'bt-gate-card';
+  logEvent('info', `Bluetooth proximity check started…`);
+
+  try {
+    const resp = await fetch('/bluetooth/check', {
+      method:'POST',
+      headers:{'Content-Type':'application/json','X-CSRFToken':CSRF_TOKEN},
+      body: JSON.stringify({ user_id: userId })
+    });
+    const data = await resp.json();
+
+    signal.classList.remove('scanning');
+    btn.disabled = false;
+
+    if (data.found) {
+      // ✅ Phone detected — unlock face scan flow
+      btVerified = true;
+      btVerifiedUser = {
+        user_id:   userId,
+        username:  data.username,
+        full_name: data.full_name,
+      };
+
+      card.className = 'bt-gate-card verified';
+      resultEl.className = 'bt-gate-result ok';
+      resultEl.style.display = 'flex';
+      const rssiPill = data.rssi !== null
+        ? `<span class="rssi-pill">📶 ${data.rssi} dBm</span>`
+        : '';
+      resultEl.innerHTML = `
+        <svg width="18" height="18" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.5">
+          <polyline points="20 6 9 17 4 12"></polyline>
+        </svg>
+        <span><strong>${data.full_name}</strong>'s phone is nearby. ${rssiPill} Proceed to face scan.</span>`;
+
+      logEvent('success', `BT verified: ${data.full_name} (${data.message})`);
+
+      // Unlock camera & face scan
+      unlockCameraControls(true);
+      unlockFaceScan(true);
+      
+      // Auto-start camera once Bluetooth is verified in range
+      startCamera();
+
+      postLog('BT Proximity Check', data.username, 'Camera Station', 'Success',
+        `Phone detected: ${data.message}`);
+
+    } else if (!data.success && data.error) {
+      // No MAC / error
+      card.className = 'bt-gate-card denied';
+      resultEl.className = 'bt-gate-result warn';
+      resultEl.style.display = 'flex';
+      resultEl.innerHTML = `
+        <svg width="18" height="18" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.5">
+          <circle cx="12" cy="12" r="10"/><line x1="12" y1="8" x2="12" y2="12"/>
+          <line x1="12" y1="16" x2="12.01" y2="16"/>
+        </svg>
+        <span>${data.error || data.message}</span>`;
+      logEvent('warning', `BT check: ${data.error || data.message}`);
+
+    } else {
+      // ❌ Phone not detected — deny
+      btVerified = false;
+      card.className = 'bt-gate-card denied';
+      resultEl.className = 'bt-gate-result err';
+      resultEl.style.display = 'flex';
+      resultEl.innerHTML = `
+        <svg width="18" height="18" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.5">
+          <line x1="18" y1="6" x2="6" y2="18"/><line x1="6" y1="6" x2="18" y2="18"/>
+        </svg>
+        <span><strong>Access Denied</strong> — ${data.full_name || 'User'}'s phone not detected nearby. ${data.message}</span>`;
+
+      logEvent('warning', `BT denied: ${data.message}`);
+      postLog('Access Denied', data.username || 'Unknown', 'Camera Station', 'Failed',
+        `Bluetooth proximity check failed: ${data.message}`);
+    }
+
+  } catch(err) {
+    signal.classList.remove('scanning');
+    btn.disabled = false;
+    resultEl.className = 'bt-gate-result warn';
+    resultEl.style.display = 'flex';
+    resultEl.innerHTML = `
+      <svg width="18" height="18" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.5">
+        <circle cx="12" cy="12" r="10"/><line x1="12" y1="8" x2="12" y2="12"/>
+        <line x1="12" y1="16" x2="12.01" y2="16"/>
+      </svg>
+      <span>Network error: ${err.message}</span>`;
+    logEvent('error', 'BT check network error: ' + err.message);
+  }
+}
+
+/* ── Camera enumeration ─────────────────────────────────────────────────── */
 async function enumerateDevices() {
   try {
-    // Request permission first so device labels are populated
     const tmp = await navigator.mediaDevices.getUserMedia({ video: true });
     tmp.getTracks().forEach(t => t.stop());
   } catch (_) {}
@@ -246,7 +592,6 @@ async function startCamera() {
     video.srcObject = stream;
     await video.play();
 
-    // Show video, hide placeholder
     placeholder.style.display = 'none';
     video.style.display       = 'block';
     canvas.style.display      = 'block';
@@ -255,11 +600,10 @@ async function startCamera() {
     applyMirror();
     resizeCanvas();
 
-    // Update UI state
     setStatus(true);
     document.getElementById('btnStart').disabled    = true;
     document.getElementById('btnStop').disabled     = false;
-    document.getElementById('btnScan').disabled     = false;
+    document.getElementById('btnScan').disabled     = false;  // BT already verified
     document.getElementById('btnSnapshot').disabled = false;
 
     const t = stream.getVideoTracks()[0].getSettings();
@@ -268,6 +612,7 @@ async function startCamera() {
 
     logEvent('info', 'Camera started.');
     drawOverlay();
+    setStep(3);
   } catch (err) {
     const msg = err.name === 'NotAllowedError'
       ? 'Camera access denied. Allow camera permission and try again.'
@@ -300,16 +645,17 @@ function stopCamera() {
   document.getElementById('camResLabel').textContent = '—';
   hideResult();
   logEvent('info', 'Camera stopped.');
+  if (btVerified) setStep(2);
 }
 
-/* ── Mirror helper ─────────────────────────────────────────────────────── */
+/* ── Mirror helper ──────────────────────────────────────────────────────── */
 function applyMirror() {
   const mirror = document.getElementById('mirrorToggle').checked;
   video.style.transform  = mirror ? 'scaleX(-1)' : '';
   canvas.style.transform = mirror ? 'scaleX(-1)' : '';
 }
 
-/* ── Canvas sizing ─────────────────────────────────────────────────────── */
+/* ── Canvas sizing ──────────────────────────────────────────────────────── */
 function resizeCanvas() {
   canvas.width  = video.videoWidth  || video.clientWidth;
   canvas.height = video.videoHeight || video.clientHeight;
@@ -318,7 +664,7 @@ function resizeCanvas() {
 window.addEventListener('resize', () => { if (stream) resizeCanvas(); });
 video.addEventListener('loadedmetadata', resizeCanvas);
 
-/* ── Overlay drawing loop ──────────────────────────────────────────────── */
+/* ── Overlay drawing loop ───────────────────────────────────────────────── */
 function drawOverlay() {
   if (!stream) return;
   resizeCanvas();
@@ -326,7 +672,6 @@ function drawOverlay() {
 
   const w = canvas.width, h = canvas.height;
   const cx = w / 2, cy = h / 2;
-  // Face oval guide
   const rx = w * 0.18, ry = h * 0.28;
 
   ctx.save();
@@ -338,7 +683,6 @@ function drawOverlay() {
   ctx.stroke();
   ctx.setLineDash([]);
 
-  // Grid lines (subtle)
   ctx.strokeStyle = 'rgba(21,213,238,0.06)';
   ctx.lineWidth   = 1;
   for (let x = 0; x < w; x += 64) {
@@ -352,9 +696,14 @@ function drawOverlay() {
   animFrame = requestAnimationFrame(drawOverlay);
 }
 
-/* ── Scan (simulated recognition) ─────────────────────────────────────── */
-function runScan() {
+/* ── Scan — real face_recognition API call ───────────────────────────────── */
+async function runScan() {
   if (!stream) return;
+  if (!btVerified) {
+    logEvent('warning', 'Bluetooth proximity check required before scanning.');
+    return;
+  }
+
   const btn = document.getElementById('btnScan');
   btn.disabled = true;
   btn.innerHTML = `
@@ -364,53 +713,151 @@ function runScan() {
     Scanning…`;
 
   hideResult();
-  logEvent('info', 'Scanning…');
-
-  // Capture a frame from the video to simulate a scan
+  document.getElementById('grantedUserBox').style.display = 'none';
+  
+  /* ── Capture a frame from the live video ── */
   const snap  = document.createElement('canvas');
-  snap.width  = video.videoWidth;
-  snap.height = video.videoHeight;
+  snap.width  = video.videoWidth  || 640;
+  snap.height = video.videoHeight || 480;
   const sCtx  = snap.getContext('2d');
-  if (document.getElementById('mirrorToggle').checked) {
+
+  const mirrored = document.getElementById('mirrorToggle').checked;
+  if (mirrored) {
     sCtx.translate(snap.width, 0);
     sCtx.scale(-1, 1);
   }
   sCtx.drawImage(video, 0, 0, snap.width, snap.height);
 
+  const imageData  = snap.toDataURL('image/jpeg', 0.92);
   const accessPoint = document.getElementById('accessPointSelect').value;
+  const user        = btVerifiedUser;
 
-  // Simulate async processing (1.5 s)
-  setTimeout(() => {
-    const granted = Math.random() > 0.35;   // ~65 % success rate for demo
-    const name    = granted ? pickRandomUser() : null;
-    const conf    = granted ? (Math.random() * 8 + 91).toFixed(1) : null; // 91–99 %
+  logEvent('info', `Sending frame to server for recognition (user: ${user ? user.full_name : '?'})…`);
 
-    if (granted && name) {
-      showResult('granted', `Access Granted — ${name}`,
-        `Confidence ${conf}% · ${accessPoint}`);
-      logEvent('success', `Access Granted: ${name} @ ${accessPoint} (${conf}%)`);
-      postLog('Access Granted', name, accessPoint, 'Success',
-        `Facial match confidence ${conf}%`);
-    } else {
-      showResult('denied', 'Access Denied',
-        'No matching face found in the system.');
-      logEvent('warning', `Access Denied @ ${accessPoint}`);
-      postLog('Access Denied', 'Unknown', accessPoint, 'Failed',
-        'No matching face found');
+  // Show a hint after 5s in case dlib models are loading on first run
+  const slowHintTimer = setTimeout(() => {
+    logEvent('info', 'Loading recognition models… (first run may take ~30s, please wait)');
+  }, 5000);
+
+  /* ── POST to real /authentication/recognize endpoint ── */
+  // Use AbortController with a 120s timeout so the browser never shows
+  // an ambiguous "Failed to fetch" — users see a clear timeout message instead.
+  const controller = new AbortController();
+  const timeoutId  = setTimeout(() => controller.abort(), 120000);  // 120s
+
+  try {
+    const resp = await fetch('/authentication/recognize', {
+      method:  'POST',
+      headers: {
+        'Content-Type': 'application/json',
+        'X-CSRFToken':  CSRF_TOKEN,
+      },
+      body: JSON.stringify({
+        user_id:      user ? user.user_id : null,
+        image_data:   imageData,
+        access_point: accessPoint,
+      }),
+      signal: controller.signal,
+    });
+
+    clearTimeout(slowHintTimer);
+    clearTimeout(timeoutId);
+
+    const data = await resp.json();
+
+    /* ── Handle errors from the server ── */
+    if (!resp.ok || data.error) {
+      const errMsg = data.error || `Server error ${resp.status}`;
+
+      if (resp.status === 422) {
+        /* No enrollment photo */
+        showResult('warning', '⚠ No Enrollment Photo',
+          errMsg + ' — Go to User Management to upload a face photo.');
+        logEvent('warning', `Enrollment missing: ${errMsg}`);
+      } else if (resp.status === 503) {
+        /* Library not installed */
+        showResult('warning', '⚠ Server Configuration',
+          'face_recognition library not installed. Run: pip install face_recognition');
+        logEvent('error', 'face_recognition not installed on server.');
+      } else {
+        showResult('warning', '⚠ Recognition Error', errMsg);
+        logEvent('warning', `Recognition error: ${errMsg}`);
+      }
+
+      btn.disabled = false;
+      btn.innerHTML = _scanBtnHtml();
+      return;
     }
 
-    btn.disabled = false;
-    btn.innerHTML = `
-      <svg width="18" height="18" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2">
-        <path d="M2 12h1M21 12h1M12 2v1M12 21v1"></path>
-        <path d="M4.93 4.93l.7.7M18.36 18.36l.71.71M4.93 19.07l.7-.7M18.36 5.64l.71-.71"></path>
-        <circle cx="12" cy="12" r="5"></circle>
-      </svg>
-      Scan Face`;
-  }, 1500);
+    /* ── Process the real result ── */
+    const faceCount = data.face_count || 0;
+    const conf      = data.confidence;
+    const matched   = data.match;
+
+    if (faceCount === 0) {
+      /* No face in frame */
+      showResult('warning', '⚠ No Face Detected',
+        'Position your face clearly in front of the camera and try again.');
+      logEvent('warning', 'No face detected in the captured frame.');
+
+    } else if (matched) {
+      /* ✅ ACCESS GRANTED */
+      const grantedBox = document.getElementById('grantedUserBox');
+      document.getElementById('grantedUserAvatar').textContent = data.full_name[0].toUpperCase();
+      document.getElementById('grantedUserName').textContent   = data.full_name;
+      document.getElementById('grantedUserSub').textContent    =
+        `Access Granted · ${conf}% confidence · ${accessPoint}`;
+      grantedBox.style.display = 'block';
+
+      showResult('granted', '✓ Access Granted',
+        `${data.full_name} · Confidence ${conf}% · ${accessPoint}`);
+      logEvent('success',
+        `✓ GRANTED: ${data.full_name} @ ${accessPoint} (confidence ${conf}%, distance ${data.distance})`);
+
+      /* Log is already written by the backend — no duplicate postLog() needed */
+
+    } else {
+      /* ❌ ACCESS DENIED — face detected but does not match */
+      document.getElementById('grantedUserBox').style.display = 'none';
+      showResult('denied', '✗ Access Denied',
+        `Face not recognised (confidence ${conf}%). Please retry or contact administrator.`);
+      logEvent('warning',
+        `✗ DENIED: face did not match ${data.full_name} @ ${accessPoint} (confidence ${conf}%, distance ${data.distance})`);
+    }
+
+  } catch (err) {
+    clearTimeout(slowHintTimer);
+    clearTimeout(timeoutId);
+
+    /* Distinguish abort (timeout) from genuine network errors */
+    if (err.name === 'AbortError') {
+      showResult('warning', '⚠ Scan Timed Out',
+        'The recognition server took too long to respond. The server may still be loading its models — please try again in a few seconds.');
+      logEvent('error', 'Face scan timed out after 120s — server may be loading models. Retry shortly.');
+    } else {
+      showResult('warning', '⚠ Connection Error',
+        'Could not reach the recognition server: ' + err.message);
+      logEvent('error', 'Network error during face scan: ' + err.message);
+    }
+  }
+
+  btn.disabled = false;
+  btn.innerHTML = _scanBtnHtml();
 }
 
-/* ── Snapshot ─────────────────────────────────────────────────────────── */
+/* ── Helper: the default Scan Face button HTML ─────────────────────────── */
+function _scanBtnHtml() {
+  return `
+    <svg width="18" height="18" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2">
+      <path d="M2 12h1M21 12h1M12 2v1M12 21v1"></path>
+      <path d="M4.93 4.93l.7.7M18.36 18.36l.71.71M4.93 19.07l.7-.7M18.36 5.64l.71-.71"></path>
+      <circle cx="12" cy="12" r="5"></circle>
+    </svg>
+    Scan Face`;
+}
+
+
+/* ── Snapshot ───────────────────────────────────────────────────────────── */
 function captureSnapshot() {
   if (!stream) return;
   const snap  = document.createElement('canvas');
@@ -441,7 +888,6 @@ function captureSnapshot() {
   label.className = 'snap-label';
   label.textContent = `#${snapshotCount}`;
 
-  // Download link
   const dl    = document.createElement('a');
   dl.href     = url;
   dl.download = `snapshot-${snapshotCount}.jpg`;
@@ -470,7 +916,7 @@ function toggleFullscreen() {
   }
 }
 
-/* ── UI helpers ──────────────────────────────────────────────────────────── */
+/* ── UI helpers ─────────────────────────────────────────────────────────── */
 function setStatus(active) {
   const dot   = document.getElementById('camStatusDot');
   const label = document.getElementById('camStatusLabel');
@@ -479,10 +925,10 @@ function setStatus(active) {
 }
 
 function showResult(type, status, detail) {
-  const box    = document.getElementById('authResult');
-  const icon   = document.getElementById('resultIcon');
-  const sEl    = document.getElementById('resultStatus');
-  const dEl    = document.getElementById('resultDetail');
+  const box  = document.getElementById('authResult');
+  const icon = document.getElementById('resultIcon');
+  const sEl  = document.getElementById('resultStatus');
+  const dEl  = document.getElementById('resultDetail');
 
   box.style.display  = 'flex';
   box.className      = 'auth-result result-' + type;
@@ -509,7 +955,7 @@ function hideResult() {
 
 /* ── Session log feed ───────────────────────────────────────────────────── */
 function logEvent(type, message) {
-  const feed = document.getElementById('authLogFeed');
+  const feed  = document.getElementById('authLogFeed');
   const empty = feed.querySelector('.log-empty');
   if (empty) empty.remove();
 
@@ -521,7 +967,6 @@ function logEvent(type, message) {
   row.innerHTML = `<span class="log-time">${time}</span><span class="log-msg">${message}</span>`;
   feed.prepend(row);
 
-  // Keep max 50 entries
   while (feed.children.length > 50) feed.lastChild.remove();
 }
 
@@ -530,24 +975,12 @@ function clearLog() {
   feed.innerHTML = '<p class="log-empty">No events yet this session.</p>';
 }
 
-/* ── Pick a random registered user (for demo simulation) ─────────────── */
-const registeredUsers = [
-  {% for user in users %}
-    {% if user.status == 'Active' %}"{{ user.full_name|e }}"{% if not loop.last %},{% endif %}{% endif %}
-  {% endfor %}
-];
-
-function pickRandomUser() {
-  if (!registeredUsers.length) return 'Registered User';
-  return registeredUsers[Math.floor(Math.random() * registeredUsers.length)];
-}
-
-/* ── POST log entry to server ─────────────────────────────────────────── */
+/* ── POST log entry to server ───────────────────────────────────────────── */
 function postLog(eventType, username, accessPoint, status, details) {
   fetch('{{ url_for("authentication_log") }}', {
     method: 'POST',
     headers: { 'Content-Type': 'application/json',
-               'X-CSRFToken': '{{ csrf_token() }}' },
+               'X-CSRFToken': CSRF_TOKEN },
     body: JSON.stringify({
       event_type:   eventType,
       username:     username,
@@ -558,7 +991,7 @@ function postLog(eventType, username, accessPoint, status, details) {
   });
 }
 
-/* ── Cleanup on page leave ────────────────────────────────────────────── */
+/* ── Cleanup on page leave ──────────────────────────────────────────────── */
 window.addEventListener('beforeunload', () => {
   if (stream) stream.getTracks().forEach(t => t.stop());
 });

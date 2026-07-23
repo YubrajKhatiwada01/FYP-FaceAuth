@@ -41,13 +41,11 @@
         </svg>
         <span>Face Auth</span>
       </a>
-      <a href="{{ url_for('fingerprint') }}" class="nav-item{{ ' is-active' if active_page == 'fingerprint' else '' }}">
+      <a href="{{ url_for('bluetooth') }}" class="nav-item{{ ' is-active' if active_page == 'bluetooth' else '' }}">
         <svg width="20" height="20" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2">
-          <path d="M12 22s-8-4.5-8-11.8A8 8 0 0 1 12 2a8 8 0 0 1 8 8.2c0 7.3-8 11.8-8 11.8z"/>
-          <path d="M12 8a2 2 0 1 0 0 4 2 2 0 0 0 0-4z"/>
-          <path d="M12 12v4"/>
+          <polyline points="6.5 6.5 17.5 17.5 12 23 12 1 17.5 6.5 6.5 17.5"></polyline>
         </svg>
-        <span>Fingerprint</span>
+        <span>Bluetooth 2FA</span>
       </a>
       <a href="{{ url_for('access_control') }}" class="nav-item{{ ' is-active' if active_page == 'access_control' else '' }}">
         <svg width="20" height="20" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2">

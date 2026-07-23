@@ -1,34 +1,66 @@
-import os
-import uuid
-import json
+"""
+app.py — FaceAuth Flask Application
+=====================================
+Two-factor physical access control:
+  Step 1 — Bluetooth proximity check (BLE scan via bleak)
+  Step 2 — Live facial recognition (dlib via face_recognition)
+
+Backend: AWS DynamoDB (users/logs/access-points) + S3 (photos) + Lambda (post-auth trigger)
+"""
+
 import base64
+import logging
+import os
+import threading
+import uuid
+from concurrent.futures import ThreadPoolExecutor
 from functools import wraps
 
-from flask import (Flask, render_template, request, redirect,           # type: ignore[import-untyped]
-                   url_for, session, jsonify, send_from_directory)
+from dotenv import load_dotenv                                            # type: ignore[import-untyped]
+from flask import (Flask, Response, jsonify, redirect,                   # type: ignore[import-untyped]
+                   render_template, request, send_from_directory,
+                   session, url_for)
 from flask_wtf.csrf import CSRFProtect, generate_csrf                    # type: ignore[import-untyped]
 from werkzeug.security import check_password_hash                        # type: ignore[import-untyped]
 from werkzeug.utils import secure_filename                               # type: ignore[import-untyped]
-from dotenv import load_dotenv                                           # type: ignore[import-untyped]
 
-import webauthn                                                          # type: ignore[import-untyped]
-from webauthn.helpers.structs import (                                   # type: ignore[import-untyped]
-    AuthenticatorSelectionCriteria,
-    UserVerificationRequirement,
-    ResidentKeyRequirement,
-    AuthenticatorAttachment,
-    PublicKeyCredentialDescriptor,
-)
-from webauthn.helpers.cose import COSEAlgorithmIdentifier               # type: ignore[import-untyped]
-
+# Internal modules
 from config import config
-import database as db
+import aws_dynamodb as db           # DynamoDB — users, logs, access-points
+import aws_s3                       # S3 — enrolled face photos
+import aws_lambda_client            # Lambda — post-auth event trigger
+import bluetooth_scanner as bt      # BLE proximity scanner
+import face_recognition_service as frs  # dlib face recognition
 
 # ---------------------------------------------------------------------------
-# Load environment variables FIRST before anything reads them
+# Bootstrap
 # ---------------------------------------------------------------------------
 
-load_dotenv()
+load_dotenv()  # must be first — reads .env before any os.environ.get() calls
+
+logging.basicConfig(
+    level=logging.INFO,
+    format="%(asctime)s [%(levelname)s] %(name)s: %(message)s",
+    datefmt="%Y-%m-%d %H:%M:%S",
+)
+logger = logging.getLogger(__name__)
+
+# ---------------------------------------------------------------------------
+# Application factory
+# ---------------------------------------------------------------------------
+
+app = Flask(__name__)
+
+_config_name = os.environ.get("FLASK_ENV", "development") or "default"
+app.config.from_object(config[_config_name])
+
+csrf = CSRFProtect(app)
+
+# Local upload folder (dev fallback; production uses S3)
+UPLOAD_FOLDER = os.path.join(os.path.dirname(os.path.abspath(__file__)), "static", "uploads")
+os.makedirs(UPLOAD_FOLDER, exist_ok=True)
+app.config["UPLOAD_FOLDER"]      = UPLOAD_FOLDER
+app.config["MAX_CONTENT_LENGTH"] = 5 * 1024 * 1024  # 5 MB
 
 # ---------------------------------------------------------------------------
 # Constants
@@ -36,60 +68,99 @@ load_dotenv()
 
 ALLOWED_EXTENSIONS = {"png", "jpg", "jpeg", "gif", "webp"}
 
-RP_ID   = os.environ.get("RP_ID",   "localhost")
-RP_NAME = os.environ.get("RP_NAME", "FaceAuth")
-ORIGIN  = os.environ.get("ORIGIN",  "http://localhost:5000")
+# Bluetooth proximity thresholds (override in .env)
+BT_RSSI_THRESHOLD = int(os.environ.get("BT_RSSI_THRESHOLD", "-50"))
+BT_SCAN_DURATION  = float(os.environ.get("BT_SCAN_DURATION", "6.0"))
 
 # ---------------------------------------------------------------------------
-# App setup
+# Database initialisation
 # ---------------------------------------------------------------------------
-
-app = Flask(__name__)
-
-config_name = os.environ.get('FLASK_ENV', 'development') or 'default'
-app.config.from_object(config[config_name])
-
-csrf = CSRFProtect(app)
-
-UPLOAD_FOLDER = os.path.join(os.path.dirname(os.path.abspath(__file__)), "static", "uploads")
-os.makedirs(UPLOAD_FOLDER, exist_ok=True)
-app.config["UPLOAD_FOLDER"]      = UPLOAD_FOLDER
-app.config["MAX_CONTENT_LENGTH"] = 5 * 1024 * 1024  # 5 MB
 
 with app.app_context():
     db.init_db()
 
 # ---------------------------------------------------------------------------
+# Face recognition model pre-warm
+# ---------------------------------------------------------------------------
+# dlib loads its CNN/HOG models on the very first call, which can take
+# 30–90 s. Pre-warming in a background daemon thread at startup means the
+# models are in memory before the first real authentication request arrives,
+# preventing "Failed to fetch" timeouts on the first scan.
+
+def _prewarm_face_recognition() -> None:
+    try:
+        import face_recognition as _fr  # type: ignore[import-untyped]
+        import numpy as _np
+        dummy = _np.zeros((100, 100, 3), dtype=_np.uint8)
+        _fr.face_locations(dummy)
+        _fr.face_encodings(dummy)
+        logger.info("[prewarm] face_recognition models loaded and ready.")
+    except Exception as exc:
+        logger.warning("[prewarm] face_recognition pre-warm skipped: %s", exc)
+
+
+threading.Thread(
+    target=_prewarm_face_recognition,
+    daemon=True,
+    name="fr-prewarm",
+).start()
+
+# ---------------------------------------------------------------------------
 # Helpers
 # ---------------------------------------------------------------------------
 
-def allowed_file(filename):
+def allowed_file(filename: str) -> bool:
+    """Return True if the file has a permitted image extension."""
     return "." in filename and filename.rsplit(".", 1)[1].lower() in ALLOWED_EXTENSIONS
 
 
-def _b64url_decode(s):
-    """Decode a base64url string with correct padding (no over-padding)."""
-    s = s.replace("+", "-").replace("/", "_")   # normalise to url-safe alphabet
-    padding = (4 - len(s) % 4) % 4
-    return base64.urlsafe_b64decode(s + "=" * padding)
-
-
 def login_required(f):
+    """Decorator — redirects unauthenticated users to the login page."""
     @wraps(f)
     def decorated(*args, **kwargs):
-        if not session.get('is_logged_in'):
-            return redirect(url_for('login'))
+        if not session.get("is_logged_in"):
+            return redirect(url_for("login"))
         return f(*args, **kwargs)
     return decorated
 
 
 @app.context_processor
 def inject_csrf_token():
-    return {'csrf_token': generate_csrf}
+    return {"csrf_token": generate_csrf}
 
-# ---------------------------------------------------------------------------
-# Public routes
-# ---------------------------------------------------------------------------
+
+def _upload_photos_to_s3(files, username: str) -> list[str]:
+    """
+    Read up to 10 valid image files and upload them to S3 in parallel.
+
+    Args:
+        files    : list of werkzeug FileStorage objects
+        username : used to build the S3 key prefix
+
+    Returns:
+        List of S3 keys for successfully uploaded files.
+    """
+    valid = [f for f in files if f and f.filename and allowed_file(f.filename)][:10]
+    if not valid:
+        return []
+
+    payloads = []
+    for idx, f in enumerate(valid):
+        ext    = secure_filename(f.filename).rsplit(".", 1)[1].lower()
+        s3_key = f"users/{username}/photos/sample_{idx}_{uuid.uuid4().hex[:6]}.{ext}"
+        payloads.append((f.read(), s3_key))
+
+    def _upload(item):
+        data, key = item
+        return aws_s3.upload_photo_bytes(data, key)
+
+    with ThreadPoolExecutor(max_workers=len(payloads)) as pool:
+        return list(pool.map(_upload, payloads))
+
+
+# ===========================================================================
+# Routes — Public
+# ===========================================================================
 
 @app.get("/")
 def landing():
@@ -98,8 +169,8 @@ def landing():
 
 @app.route("/login", methods=["GET", "POST"])
 def login():
-    if session.get('is_logged_in'):
-        return redirect(url_for('dashboard'))
+    if session.get("is_logged_in"):
+        return redirect(url_for("dashboard"))
 
     message = None
 
@@ -113,14 +184,14 @@ def login():
                 message = {"type": "error",
                            "text": "Account is inactive. Contact your administrator."}
             else:
-                session['operator_id']  = username
-                session['user_id']      = user["id"]
-                session['user_role']    = user["role"]
-                session['is_logged_in'] = True
+                session["operator_id"]  = username
+                session["user_id"]      = user["id"]
+                session["user_role"]    = user["role"]
+                session["is_logged_in"] = True
                 session.permanent       = True
                 db.add_log("Login", username, "Dashboard", "Success",
                            f"Operator {username} logged in")
-                return redirect(url_for('dashboard'))
+                return redirect(url_for("dashboard"))
         else:
             db.add_log("Login", username or "unknown", "Dashboard", "Failed",
                        "Invalid credentials")
@@ -128,46 +199,62 @@ def login():
                        "text": "Invalid Operator ID or Access Token."}
 
     return render_template("login.html", active_page="login", message=message,
-                           csrf_token=generate_csrf(), body_class="login-body")
+                           body_class="login-body")
 
 
 @app.route("/logout")
 def logout():
-    username = session.get('operator_id', 'unknown')
+    username = session.get("operator_id", "unknown")
     db.add_log("Logout", username, "Dashboard", "Success",
                f"Operator {username} logged out")
     session.clear()
-    return redirect(url_for('login'))
+    return redirect(url_for("login"))
 
-# ---------------------------------------------------------------------------
-# Dashboard
-# ---------------------------------------------------------------------------
+
+# ===========================================================================
+# Routes — Dashboard
+# ===========================================================================
 
 @app.route("/dashboard")
 @login_required
 def dashboard():
-    stats = {
-        "access_granted": db.count_access_granted(),
-        "access_denied":  db.count_access_denied(),
-        "active_users":   db.count_active_users(),
-        "active_points":  db.count_active_access_points(),
-    }
-    recent_logs = db.get_recent_logs(limit=5)
-    return render_template("dashboard.html", active_page="dashboard",
-                           operator_id=session.get('operator_id', 'User'),
-                           stats=stats, recent_logs=recent_logs)
+    with ThreadPoolExecutor(max_workers=5) as pool:
+        f_granted = pool.submit(db.count_access_granted)
+        f_denied  = pool.submit(db.count_access_denied)
+        f_users   = pool.submit(db.count_active_users)
+        f_points  = pool.submit(db.count_active_access_points)
+        f_logs    = pool.submit(db.get_recent_logs, limit=5)
 
-# ---------------------------------------------------------------------------
-# Users
-# ---------------------------------------------------------------------------
+        stats = {
+            "access_granted": f_granted.result(),
+            "access_denied":  f_denied.result(),
+            "active_users":   f_users.result(),
+            "active_points":  f_points.result(),
+        }
+        recent_logs = f_logs.result()
+
+    return render_template(
+        "dashboard.html",
+        active_page="dashboard",
+        operator_id=session.get("operator_id", "User"),
+        stats=stats,
+        recent_logs=recent_logs,
+    )
+
+
+# ===========================================================================
+# Routes — Users
+# ===========================================================================
 
 @app.route("/users")
 @login_required
 def users():
-    all_users = db.get_all_users()
-    return render_template("users.html", active_page="users",
-                           operator_id=session.get('operator_id', 'User'),
-                           users=all_users)
+    return render_template(
+        "users.html",
+        active_page="users",
+        operator_id=session.get("operator_id", "User"),
+        users=db.get_all_users(),
+    )
 
 
 @app.route("/users/add", methods=["POST"])
@@ -185,25 +272,25 @@ def add_user():
         return jsonify({"success": False,
                         "error": "Full name, username and password are required."}), 400
 
-    photo_path = None
-    file = request.files.get("photo")
-    if file and file.filename and allowed_file(file.filename):
-        ext      = secure_filename(file.filename).rsplit(".", 1)[1].lower()
-        filename = f"{uuid.uuid4().hex}.{ext}"
-        file.save(os.path.join(app.config["UPLOAD_FOLDER"], filename))
-        photo_path = filename
+    files = (
+        [request.files.get("photo")]
+        + request.files.getlist("samples")
+        + request.files.getlist("samples[]")
+    )
+    s3_keys     = _upload_photos_to_s3(files, username)
+    primary_key = s3_keys[0] if s3_keys else None
 
     ok, err = db.create_user(full_name, username, password, role, status,
-                             email, phone, photo_path)
+                             email, phone, primary_key, s3_keys)
     if not ok:
         return jsonify({"success": False, "error": err}), 409
 
-    db.add_log("User Created", session.get('operator_id'), "Users", "Success",
-               f"User '{username}' created by {session.get('operator_id')}")
+    db.add_log("User Created", session.get("operator_id"), "Users", "Success",
+               f"User '{username}' created with {len(s3_keys)} photo(s) in S3")
     return jsonify({"success": True})
 
 
-@app.route("/users/<int:user_id>/edit", methods=["POST"])
+@app.route("/users/<user_id>/edit", methods=["POST"])
 @login_required
 def edit_user(user_id):
     full_name = request.form.get("full_name", "").strip()
@@ -213,275 +300,345 @@ def edit_user(user_id):
     phone     = request.form.get("phone",     "").strip()
 
     if not full_name:
-        return jsonify({"success": False,
-                        "error": "Full name is required."}), 400
+        return jsonify({"success": False, "error": "Full name is required."}), 400
 
-    # Ensure the user actually exists before updating
     existing = db.get_user_by_id(user_id)
     if not existing:
         return jsonify({"success": False, "error": "User not found."}), 404
 
     db.update_user(user_id, full_name, role, status, email, phone)
 
-    file = request.files.get("photo")
-    if file and file.filename and allowed_file(file.filename):
-        if existing and existing["photo_path"]:
-            old = os.path.join(app.config["UPLOAD_FOLDER"], existing["photo_path"])
-            if os.path.exists(old):
-                os.remove(old)
-        ext      = secure_filename(file.filename).rsplit(".", 1)[1].lower()
-        filename = f"{uuid.uuid4().hex}.{ext}"
-        file.save(os.path.join(app.config["UPLOAD_FOLDER"], filename))
-        db.update_user_photo(user_id, filename)
+    # Re-upload photos only when new files are submitted
+    main_file    = request.files.get("photo")
+    sample_files = request.files.getlist("samples") + request.files.getlist("samples[]")
+    new_files    = [main_file] + sample_files
+    has_new      = any(f and f.filename for f in new_files)
 
-    db.add_log("User Updated", session.get('operator_id'), "Users", "Success",
+    if has_new:
+        # Delete old S3 photos first
+        for old_key in (existing.get("photos") or []):
+            aws_s3.delete_photo(old_key)
+        if not existing.get("photos") and existing.get("photo_path"):
+            aws_s3.delete_photo(existing["photo_path"])
+
+        username    = existing.get("username", "unknown")
+        s3_keys     = _upload_photos_to_s3(new_files, username)
+        primary_key = s3_keys[0] if s3_keys else None
+        db.update_user_photo(user_id, primary_key)
+        db.update_user_photos(user_id, s3_keys)
+
+        # Invalidate cached face encodings so next auth uses fresh photos
+        frs.clear_cache(user_id)
+
+    db.add_log("User Updated", session.get("operator_id"), "Users", "Success",
                f"User ID {user_id} updated by {session.get('operator_id')}")
     return jsonify({"success": True})
 
 
-@app.route("/users/<int:user_id>/delete", methods=["POST"])
+@app.route("/users/<user_id>/delete", methods=["POST"])
 @login_required
 def delete_user(user_id):
     user = db.get_user_by_id(user_id)
     if not user:
         return jsonify({"success": False, "error": "User not found."}), 404
 
-    if user["photo_path"]:
-        photo_file = os.path.join(app.config["UPLOAD_FOLDER"], user["photo_path"])
-        if os.path.exists(photo_file):
-            os.remove(photo_file)
+    for key in (user.get("photos") or []):
+        aws_s3.delete_photo(key)
+    if not user.get("photos") and user.get("photo_path"):
+        aws_s3.delete_photo(user["photo_path"])
 
+    frs.clear_cache(user_id)
     db.delete_user(user_id)
-    db.add_log("User Deleted", session.get('operator_id'), "Users", "Success",
+    db.add_log("User Deleted", session.get("operator_id"), "Users", "Success",
                f"User '{user['username']}' deleted by {session.get('operator_id')}")
     return jsonify({"success": True})
 
-# ---------------------------------------------------------------------------
-# Face Authentication
-# ---------------------------------------------------------------------------
+
+@app.route("/users/<user_id>/bluetooth", methods=["POST"])
+@login_required
+def set_user_bluetooth(user_id):
+    """Assign or clear a Bluetooth MAC address for a user."""
+    data = request.get_json(silent=True) or {}
+    mac  = data.get("mac", "").strip()
+
+    if mac and not bt.validate_mac_address(mac):
+        return jsonify({"success": False,
+                        "error": "Invalid MAC address format. Use XX:XX:XX:XX:XX:XX"}), 400
+
+    user = db.get_user_by_id(user_id)
+    if not user:
+        return jsonify({"success": False, "error": "User not found."}), 404
+
+    db.update_user_bluetooth_mac(user_id, mac)
+    db.add_log("BT MAC Updated", session.get("operator_id"), "Users", "Success",
+               f"Bluetooth MAC {'set to ' + mac if mac else 'cleared'} for '{user['username']}'")
+    return jsonify({"success": True, "mac": mac.upper() if mac else None})
+
+
+# ===========================================================================
+# Routes — Face Authentication
+# ===========================================================================
 
 @app.route("/authentication")
 @login_required
 def authentication():
-    all_users = db.get_all_users()
-    return render_template("authentication.html", active_page="authentication",
-                           operator_id=session.get('operator_id', 'User'),
-                           users=all_users)
+    return render_template(
+        "authentication.html",
+        active_page="authentication",
+        operator_id=session.get("operator_id", "User"),
+        users=db.get_all_users(),
+    )
 
 
 @app.route("/authentication/log", methods=["POST"])
 @login_required
 def authentication_log():
-    data         = request.get_json(silent=True) or {}
-    event_type   = data.get("event_type",   "Access Denied")
-    username     = data.get("username",     "Unknown")
-    access_point = data.get("access_point", "Camera Station")
-    status       = data.get("status",       "Failed")
-    details      = data.get("details",      "")
-
-    db.add_log(event_type, username, access_point, status, details)
+    """Client-side log relay — write a browser-generated event to the audit log."""
+    data = request.get_json(silent=True) or {}
+    db.add_log(
+        data.get("event_type",   "Access Denied"),
+        data.get("username",     "Unknown"),
+        data.get("access_point", "Camera Station"),
+        data.get("status",       "Failed"),
+        data.get("details",      ""),
+    )
     return jsonify({"success": True})
 
-# ---------------------------------------------------------------------------
-# Fingerprint / WebAuthn
-# ---------------------------------------------------------------------------
 
-@app.route("/fingerprint")
+@app.route("/authentication/recognize", methods=["POST"])
 @login_required
-def fingerprint():
-    all_users   = db.get_all_users()
-    credentials = db.get_all_webauthn_credentials()
-    enrolled    = db.count_webauthn_enrolled()
-    return render_template(
-        "fingerprint.html",
-        active_page="fingerprint",
-        operator_id=session.get('operator_id', 'User'),
-        all_users=all_users,
-        credentials=credentials,
-        enrolled_count=enrolled,
-    )
+def authentication_recognize():
+    """
+    Face recognition endpoint.
 
+    Request body (JSON):
+        user_id      : str   — UUID of the user to verify
+        image_data   : str   — base64 data-URL (data:image/jpeg;base64,…)
+        access_point : str   — label of the physical entry point
 
-@app.route("/fingerprint/register/begin", methods=["POST"])
-@login_required
-def fp_register_begin():
-    data    = request.get_json(silent=True) or {}
-    user_id = data.get("user_id")
+    Response (JSON):
+        success    : bool
+        match      : bool
+        confidence : float   (0–100 %)
+        face_count : int
+        distance   : float
+        username   : str
+        full_name  : str
+        error      : str | null
+    """
+    if not frs.is_available():
+        return jsonify({
+            "success": False,
+            "match":   False,
+            "error":   "face_recognition library is not installed. Run: pip install face_recognition",
+        }), 503
+
+    data         = request.get_json(silent=True) or {}
+    user_id      = data.get("user_id")
+    image_data   = data.get("image_data", "")
+    access_point = data.get("access_point", "Camera Station")
+
     if not user_id:
-        return jsonify({"error": "user_id required"}), 400
-
-    user = db.get_user_by_id(int(user_id))
-    if not user:
-        return jsonify({"error": "User not found"}), 404
-
-    existing = db.get_webauthn_credentials_for_user(user["id"])
-    exclude_credentials = [
-        PublicKeyCredentialDescriptor(id=_b64url_decode(c["credential_id"]))
-        for c in existing
-    ]
-
-    options = webauthn.generate_registration_options(
-        rp_id=RP_ID,
-        rp_name=RP_NAME,
-        user_id=str(user["id"]).encode(),
-        user_name=user["username"],
-        user_display_name=user["full_name"],
-        authenticator_selection=AuthenticatorSelectionCriteria(
-            authenticator_attachment=AuthenticatorAttachment.PLATFORM,
-            resident_key=ResidentKeyRequirement.PREFERRED,
-            user_verification=UserVerificationRequirement.REQUIRED,
-        ),
-        supported_pub_key_algs=[
-            COSEAlgorithmIdentifier.ECDSA_SHA_256,
-            COSEAlgorithmIdentifier.RSASSA_PKCS1_v1_5_SHA_256,
-        ],
-        exclude_credentials=exclude_credentials,
-    )
-
-    session["fp_reg_challenge"] = base64.b64encode(options.challenge).decode()
-    session["fp_reg_user_id"]   = user["id"]
-
-    return jsonify(webauthn.options_to_json(options))
-
-
-@app.route("/fingerprint/register/complete", methods=["POST"])
-@login_required
-def fp_register_complete():
-    data      = request.get_json(silent=True) or {}
-    challenge = session.get("fp_reg_challenge")
-    user_id   = session.get("fp_reg_user_id")
-
-    if not challenge or not user_id:
-        return jsonify({"success": False, "error": "No pending registration."}), 400
-
-    device_name = data.pop("device_name", "Fingerprint Sensor")
-
-    try:
-        credential = webauthn.verify_registration_response(
-            credential=data,
-            expected_challenge=base64.b64decode(challenge),
-            expected_rp_id=RP_ID,
-            expected_origin=ORIGIN,
-            require_user_verification=True,
-        )
-    except Exception as exc:
-        return jsonify({"success": False, "error": str(exc)}), 400
-
-    cred_id    = base64.urlsafe_b64encode(credential.credential_id).rstrip(b"=").decode()
-    pub_key    = credential.credential_public_key.hex()
-    transports = json.dumps(data.get("response", {}).get("transports", []))
-
-    ok = db.save_webauthn_credential(user_id, cred_id, pub_key, device_name, transports)
-    if not ok:
-        return jsonify({"success": False, "error": "Credential already registered."}), 409
+        return jsonify({"success": False, "error": "user_id is required"}), 400
+    if not image_data:
+        return jsonify({"success": False, "error": "image_data is required"}), 400
 
     user = db.get_user_by_id(user_id)
-    db.add_log("Fingerprint Enrolled", session.get('operator_id'), "Fingerprint",
-               "Success", f"Credential registered for user '{user['username']}'")
+    if not user:
+        return jsonify({"success": False, "error": "User not found"}), 404
 
-    session.pop("fp_reg_challenge", None)
-    session.pop("fp_reg_user_id",   None)
-    return jsonify({"success": True})
+    if not user.get("photo_path"):
+        return jsonify({
+            "success":   False,
+            "match":     False,
+            "username":  user["username"],
+            "full_name": user["full_name"],
+            "error": (
+                f"No enrollment photo found for '{user['full_name']}'. "
+                "Please upload a face photo in User Management first."
+            ),
+        }), 422
+
+    # Decode the base64 data-URL from the browser canvas
+    try:
+        b64         = image_data.split(",", 1)[1] if "," in image_data else image_data
+        image_bytes = base64.b64decode(b64)
+    except Exception as exc:
+        return jsonify({"success": False, "error": f"Invalid image data: {exc}"}), 400
+
+    # Run face recognition (blocking; dlib models pre-warmed at startup)
+    result = frs.recognize_face(
+        image_bytes = image_bytes,
+        user_id     = user_id,
+        photo_path  = user.get("photo_path"),
+        photo_paths = user.get("photos"),
+        tolerance   = 0.55,
+    )
+
+    # Fire the post-auth Lambda trigger (fire-and-forget, never blocks)
+    aws_lambda_client.trigger_post_auth(
+        user_id      = str(user_id),
+        username     = user["username"],
+        full_name    = user["full_name"],
+        match        = result["match"],
+        confidence   = result["confidence"],
+        access_point = access_point,
+        event_type   = "Access Granted" if result["match"] else "Access Denied",
+    )
+
+    # Write the audit log
+    log_details = (
+        f"match={result['match']}, confidence={result['confidence']}%, "
+        f"distance={result.get('distance', 'N/A')}, faces={result['face_count']}"
+    )
+    if result.get("error"):
+        log_details += f"; error={result['error']}"
+
+    db.add_log(
+        "Access Granted" if result["match"] else "Access Denied",
+        user["username"],
+        access_point,
+        "Success" if result["match"] else "Failed",
+        log_details,
+    )
+
+    return jsonify({
+        "success":    True,
+        "match":      result["match"],
+        "confidence": result["confidence"],
+        "face_count": result["face_count"],
+        "distance":   result.get("distance"),
+        "username":   user["username"],
+        "full_name":  user["full_name"],
+        "error":      result.get("error"),
+    })
 
 
-@app.route("/fingerprint/auth/begin", methods=["POST"])
+# ===========================================================================
+# Routes — Bluetooth Proximity 2FA
+# ===========================================================================
+
+@app.route("/bluetooth")
 @login_required
-def fp_auth_begin():
+def bluetooth():
+    return render_template(
+        "bluetooth.html",
+        active_page="bluetooth",
+        operator_id=session.get("operator_id", "User"),
+        users=db.get_all_users(),
+        rssi_threshold=BT_RSSI_THRESHOLD,
+        scan_duration=BT_SCAN_DURATION,
+        bleak_available=bt.BLEAK_AVAILABLE,
+    )
+
+
+@app.route("/bluetooth/check", methods=["POST"])
+@login_required
+def bluetooth_check():
+    """
+    BLE proximity check for a single user's registered MAC address.
+
+    Request body (JSON): { "user_id": <str> }
+    """
     data    = request.get_json(silent=True) or {}
     user_id = data.get("user_id")
 
-    allow_credentials = []
-    if user_id:
-        creds = db.get_webauthn_credentials_for_user(int(user_id))
-        allow_credentials = [
-            PublicKeyCredentialDescriptor(
-                id=_b64url_decode(c["credential_id"])
-            )
-            for c in creds
-        ]
-        if not allow_credentials:
-            return jsonify({"error": "No fingerprint enrolled for this user."}), 404
+    if not user_id:
+        return jsonify({"success": False, "error": "user_id required"}), 400
 
-    options = webauthn.generate_authentication_options(
-        rp_id=RP_ID,
-        allow_credentials=allow_credentials,
-        user_verification=UserVerificationRequirement.REQUIRED,
+    user = db.get_user_by_id(user_id)
+    if not user:
+        return jsonify({"success": False, "error": "User not found"}), 404
+
+    mac = user.get("bluetooth_mac")
+    if not mac:
+        return jsonify({
+            "success":   False,
+            "found":     False,
+            "rssi":      None,
+            "username":  user["username"],
+            "full_name": user["full_name"],
+            "mac":       None,
+            "message":   f"No Bluetooth MAC registered for '{user['full_name']}'. Ask admin to set it in Users.",
+        }), 422
+
+    scan = bt.scan_for_device(
+        mac_address    = mac,
+        rssi_threshold = BT_RSSI_THRESHOLD,
+        scan_duration  = BT_SCAN_DURATION,
     )
 
-    session["fp_auth_challenge"] = base64.b64encode(options.challenge).decode()
-    return jsonify(webauthn.options_to_json(options))
+    db.add_log("BT Proximity Check", session.get("operator_id"),
+               "Camera Station",
+               "Success" if scan["found"] else "Failed",
+               f"BT check for '{user['full_name']}': {scan['message']}")
+
+    return jsonify({
+        "success":         True,
+        "found":           scan["found"],
+        "rssi":            scan["rssi"],
+        "username":        user["username"],
+        "full_name":       user["full_name"],
+        "mac":             mac,
+        "message":         scan["message"],
+        "bleak_available": scan.get("bleak_available", bt.BLEAK_AVAILABLE),
+    })
 
 
-@app.route("/fingerprint/auth/complete", methods=["POST"])
+@app.route("/bluetooth/scan-devices", methods=["POST"])
 @login_required
-def fp_auth_complete():
-    data      = request.get_json(silent=True) or {}
-    challenge = session.get("fp_auth_challenge")
-    if not challenge:
-        return jsonify({"success": False, "error": "No pending challenge."}), 400
+def bluetooth_scan_devices():
+    """
+    Discover ALL nearby BLE-advertising devices.
+    Used by the admin UI device-picker.
 
-    raw_id   = data.get("rawId", "")
-    cred_row = db.get_webauthn_credential(raw_id)
+    Optional body: { "duration": <float> }  (clamped 3–15 s, default 8 s)
+    """
+    data     = request.get_json(silent=True) or {}
+    duration = float(data.get("duration", 8.0))
+    duration = max(3.0, min(duration, 15.0))
+    return jsonify(bt.scan_nearby_devices(scan_duration=duration))
 
-    if not cred_row:
-        cred_row = db.get_webauthn_credential(raw_id.replace("+", "-").replace("/", "_"))
 
-    if not cred_row:
-        return jsonify({"success": False, "error": "Unknown credential."}), 400
+@app.route("/bluetooth/scan-all", methods=["POST"])
+@login_required
+def bluetooth_scan_all():
+    """Scan all users with registered MACs and return presence results."""
+    mac_users = [u for u in db.get_all_users() if u.get("bluetooth_mac")]
+    results   = []
 
-    try:
-        verification = webauthn.verify_authentication_response(
-            credential=data,
-            expected_challenge=base64.b64decode(challenge),
-            expected_rp_id=RP_ID,
-            expected_origin=ORIGIN,
-            credential_public_key=bytes.fromhex(cred_row["public_key"]),
-            credential_current_sign_count=cred_row["sign_count"],
-            require_user_verification=True,
+    for user in mac_users:
+        scan = bt.scan_for_device(
+            mac_address    = user["bluetooth_mac"],
+            rssi_threshold = BT_RSSI_THRESHOLD,
+            scan_duration  = 2.0,   # short scan for bulk check
         )
-    except Exception as exc:
-        db.add_log("Fingerprint Auth", session.get('operator_id'), "Fingerprint",
-                   "Failed", str(exc))
-        return jsonify({"success": False, "error": str(exc)}), 400
+        results.append({
+            "user_id":   user["id"],
+            "username":  user["username"],
+            "full_name": user["full_name"],
+            "mac":       user["bluetooth_mac"],
+            "found":     scan["found"],
+            "rssi":      scan["rssi"],
+            "message":   scan["message"],
+        })
 
-    db.update_webauthn_sign_count(cred_row["credential_id"], verification.new_sign_count)
-
-    user     = db.get_user_by_id(cred_row["user_id"])
-    username = user["username"] if user else "unknown"
-
-    if user and user["status"] != "Active":
-        return jsonify({"success": False, "error": "Account is inactive."}), 403
-
-    db.add_log("Fingerprint Auth", session.get('operator_id'), "Fingerprint",
-               "Success", f"Fingerprint verified for '{username}'")
-
-    session.pop("fp_auth_challenge", None)
-    return jsonify({"success": True, "username": username,
-                    "full_name": user["full_name"] if user else username})
+    return jsonify({"success": True, "results": results})
 
 
-@app.route("/fingerprint/credential/<cred_id>/delete", methods=["POST"])
-@login_required
-def fp_delete_credential(cred_id):
-    cred = db.get_webauthn_credential(cred_id)
-    if not cred:
-        return jsonify({"success": False, "error": "Not found."}), 404
-    db.delete_webauthn_credential(cred_id)
-    db.add_log("Fingerprint Removed", session.get('operator_id'), "Fingerprint",
-               "Success", f"Credential {cred_id[:16]}… deleted")
-    return jsonify({"success": True})
-
-# ---------------------------------------------------------------------------
-# Access Control
-# ---------------------------------------------------------------------------
+# ===========================================================================
+# Routes — Access Control
+# ===========================================================================
 
 @app.route("/access-control")
 @login_required
 def access_control():
-    points = db.get_all_access_points()
-    return render_template("access_control.html", active_page="access_control",
-                           operator_id=session.get('operator_id', 'User'),
-                           access_points=points)
+    return render_template(
+        "access_control.html",
+        active_page="access_control",
+        operator_id=session.get("operator_id", "User"),
+        access_points=db.get_all_access_points(),
+    )
 
 
 @app.route("/access-control/add", methods=["POST"])
@@ -497,12 +654,12 @@ def add_access_point():
                         "error": "Name and location are required."}), 400
 
     db.create_access_point(name, location, ap_type, status)
-    db.add_log("Access Point Created", session.get('operator_id'), name,
+    db.add_log("Access Point Created", session.get("operator_id"), name,
                "Success", f"Access point '{name}' created")
     return jsonify({"success": True})
 
 
-@app.route("/access-control/<int:ap_id>/edit", methods=["POST"])
+@app.route("/access-control/<ap_id>/edit", methods=["POST"])
 @login_required
 def edit_access_point(ap_id):
     name     = request.form.get("name",     "").strip()
@@ -511,12 +668,12 @@ def edit_access_point(ap_id):
     status   = request.form.get("status",   "Active").strip()
 
     db.update_access_point(ap_id, name, location, ap_type, status)
-    db.add_log("Access Point Updated", session.get('operator_id'), name,
+    db.add_log("Access Point Updated", session.get("operator_id"), name,
                "Success", f"Access point ID {ap_id} updated")
     return jsonify({"success": True})
 
 
-@app.route("/access-control/<int:ap_id>/delete", methods=["POST"])
+@app.route("/access-control/<ap_id>/delete", methods=["POST"])
 @login_required
 def delete_access_point(ap_id):
     ap = db.get_access_point_by_id(ap_id)
@@ -524,13 +681,14 @@ def delete_access_point(ap_id):
         return jsonify({"success": False, "error": "Access point not found."}), 404
 
     db.delete_access_point(ap_id)
-    db.add_log("Access Point Deleted", session.get('operator_id'), ap["name"],
+    db.add_log("Access Point Deleted", session.get("operator_id"), ap["name"],
                "Success", f"Access point '{ap['name']}' deleted")
     return jsonify({"success": True})
 
-# ---------------------------------------------------------------------------
-# Logs
-# ---------------------------------------------------------------------------
+
+# ===========================================================================
+# Routes — Logs
+# ===========================================================================
 
 @app.route("/logs")
 @login_required
@@ -540,9 +698,9 @@ def logs():
     date_to    = request.args.get("date_to",    "")
 
     log_rows = db.get_logs(
-        event_type=event_type or None,
-        date_from=date_from   or None,
-        date_to=date_to       or None,
+        event_type = event_type or None,
+        date_from  = date_from  or None,
+        date_to    = date_to    or None,
     )
 
     event_types = [
@@ -550,36 +708,59 @@ def logs():
         "Login", "Logout", "System Update",
         "User Created", "User Updated", "User Deleted",
         "Access Point Created", "Access Point Updated", "Access Point Deleted",
+        "BT Proximity Check", "BT MAC Updated",
     ]
 
-    return render_template("logs.html", active_page="logs",
-                           operator_id=session.get('operator_id', 'User'),
-                           logs=log_rows, event_types=event_types,
-                           selected_event=event_type,
-                           date_from=date_from, date_to=date_to)
+    return render_template(
+        "logs.html",
+        active_page="logs",
+        operator_id=session.get("operator_id", "User"),
+        logs=log_rows,
+        event_types=event_types,
+        selected_event=event_type,
+        date_from=date_from,
+        date_to=date_to,
+    )
 
-# ---------------------------------------------------------------------------
-# Settings
-# ---------------------------------------------------------------------------
+
+# ===========================================================================
+# Routes — Settings
+# ===========================================================================
 
 @app.route("/settings")
 @login_required
 def settings():
-    return render_template("settings.html", active_page="settings",
-                           operator_id=session.get('operator_id', 'User'))
+    return render_template(
+        "settings.html",
+        active_page="settings",
+        operator_id=session.get("operator_id", "User"),
+    )
 
-# ---------------------------------------------------------------------------
-# File serving
-# ---------------------------------------------------------------------------
+
+# ===========================================================================
+# Routes — Static file serving
+# ===========================================================================
 
 @app.route("/uploads/<path:filename>")
 @login_required
 def uploaded_file(filename):
-    return send_from_directory(app.config["UPLOAD_FOLDER"], filename)
+    """
+    Serve enrolled photos.
+    In AWS mode the filename is an S3 key (e.g. 'users/bob/photos/x.jpg').
+    Falls back to the local uploads folder for development.
+    """
+    if os.environ.get("AWS_ACCESS_KEY_ID"):
+        try:
+            photo_bytes, content_type = aws_s3.get_photo_bytes(filename)
+            return Response(photo_bytes, mimetype=content_type)
+        except Exception:
+            pass  # fall through to local disk
+    return send_from_directory(app.config["UPLOAD_FOLDER"], os.path.basename(filename))
 
-# ---------------------------------------------------------------------------
+
+# ===========================================================================
 # Error handlers
-# ---------------------------------------------------------------------------
+# ===========================================================================
 
 @app.errorhandler(404)
 def not_found_error(error):
@@ -602,21 +783,56 @@ def request_entity_too_large(error):
     return jsonify({"success": False,
                     "error": "File too large. Maximum upload size is 5 MB."}), 413
 
-# ---------------------------------------------------------------------------
+
+# ===========================================================================
 # Entry point
-# ---------------------------------------------------------------------------
+# ===========================================================================
 
 if __name__ == "__main__":
+    host = app.config["FLASK_HOST"]
+    port = app.config["FLASK_PORT"]
+    env  = os.environ.get("FLASK_ENV", "development")
+
+    # Optional SSL — place cert.pem + key.pem in the project root, or set
+    # SSL_CERT / SSL_KEY in .env.  Required for getUserMedia on non-localhost.
+    _cert    = os.environ.get("SSL_CERT", "cert.pem")
+    _key     = os.environ.get("SSL_KEY",  "key.pem")
+    _use_ssl = os.path.exists(_cert) and os.path.exists(_key)
+    scheme   = "https" if _use_ssl else "http"
+
+    # Suppress waitress's own "Serving on …" INFO line — we print our own banner.
+    logging.getLogger("waitress").setLevel(logging.WARNING)
+
+    # ── Startup banner ────────────────────────────────────────────────────────
+    print()
+    print("  +------------------------------------------+")
+    print("  |       FaceAuth  --  Access Control        |")
+    print("  +------------------------------------------+")
+    print(f"  |  URL  : {scheme}://{host}:{port:<24}  |")
+    print(f"  |  Mode : {env:<34} |")
+    if _use_ssl:
+        print(f"  |  SSL  : {_cert:<34} |")
+    print("  +------------------------------------------+")
+    print()
+    # ─────────────────────────────────────────────────────────────────────────
+
     try:
-        from waitress import serve
-        host = app.config['FLASK_HOST']
-        port = app.config['FLASK_PORT']
-        print(f"Starting FaceAuth on http://{host}:{port}")
-        serve(app, host=host, port=port)
+        from waitress import serve  # type: ignore[import-untyped]
+        if _use_ssl:
+            # waitress has no SSL support — use Flask dev server for HTTPS
+            app.run(host=host, port=port, debug=False,
+                    ssl_context=(_cert, _key), threaded=True)
+        else:
+            # channel_timeout: raised above the default 30 s so that slow
+            # first-run dlib model loads (up to 90 s) are never killed.
+            # threads=8: lets BLE scans and face recognition run concurrently.
+            serve(app, host=host, port=port, threads=8, channel_timeout=180)
     except ImportError:
-        # Fallback to Flask dev server if waitress is not installed
-        app.run(
-            host=app.config.get('FLASK_HOST', '127.0.0.1'),
-            port=app.config.get('FLASK_PORT', 5000),
-            debug=app.config.get('DEBUG', False),
-        )
+        # waitress not installed — fall back to Flask dev server.
+        # threaded=True is required so BLE/recognition don't block all requests.
+        ssl_ctx = (_cert, _key) if _use_ssl else None
+        app.run(host=host, port=port,
+                debug=app.config.get("DEBUG", False),
+                ssl_context=ssl_ctx,
+                threaded=True)
+

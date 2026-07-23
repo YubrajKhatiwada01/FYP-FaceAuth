@@ -3,13 +3,14 @@
   <head>
     <meta charset="utf-8">
     <meta name="viewport" content="width=device-width, initial-scale=1">
+    <meta name="csrf-token" content="{{ csrf_token() }}">
     <title>{% block title %}FaceAuth{% endblock %}</title>
     <link rel="icon" type="image/png" href="{{ url_for('static', filename='images/final logo.png') }}">
     <link rel="stylesheet" href="{{ url_for('static', filename='css/style.css') }}">
   </head>
-  <body{% if body_class %} class="{{ body_class }}{% if active_page in ['dashboard', 'users', 'access_control', 'logs', 'settings', 'authentication', 'fingerprint'] %} dashboard-page{% endif %}"{% elif active_page in ['dashboard', 'users', 'access_control', 'logs', 'settings', 'authentication', 'fingerprint'] %} class="dashboard-page"{% endif %}>
+  <body{% if body_class %} class="{{ body_class }}{% if active_page in ['dashboard', 'users', 'access_control', 'logs', 'settings', 'authentication', 'bluetooth'] %} dashboard-page{% endif %}"{% elif active_page in ['dashboard', 'users', 'access_control', 'logs', 'settings', 'authentication', 'bluetooth'] %} class="dashboard-page"{% endif %}>
     <div class="site-shell">
-      {% set dashboard_pages = ['dashboard', 'users', 'access_control', 'logs', 'settings', 'authentication', 'fingerprint'] %}
+      {% set dashboard_pages = ['dashboard', 'users', 'access_control', 'logs', 'settings', 'authentication', 'bluetooth'] %}
       {% if active_page not in dashboard_pages %}
       {% block header %}
         <header class="nav-shell">

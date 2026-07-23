@@ -1,0 +1,4 @@
+# Lambda function Python dependencies
+# boto3 is pre-installed in Lambda runtime, but pinning here
+# ensures the container build uses the same version for testing.
+boto3>=1.34.0

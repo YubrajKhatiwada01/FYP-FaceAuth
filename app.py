@@ -51,6 +51,10 @@ _door_controller = DoorTriggerController()
 FACE_TOLERANCE = float(os.environ.get("FACE_TOLERANCE", 0.55))
 _approval_events: dict = {}
 
+# Unique instance boot ID generated each time the system runs.
+# Any session from a prior run becomes immediately invalid.
+SYSTEM_BOOT_ID = uuid.uuid4().hex
+
 logging.basicConfig(
     level=logging.WARNING,
     format="%(asctime)s [%(levelname)s] %(name)s: %(message)s",
@@ -135,10 +139,18 @@ def allowed_file(filename: str) -> bool:
 
 
 def login_required(f):
-    """Decorator — redirects unauthenticated users to the login page."""
+    """
+    Decorator — redirects unauthenticated users or sessions from prior server runs
+    to the administrator login page.
+    """
     @wraps(f)
     def decorated(*args, **kwargs):
-        if not session.get("is_logged_in"):
+        if (
+            not session.get("is_logged_in")
+            or session.get("boot_id") != SYSTEM_BOOT_ID
+            or "admin" not in str(session.get("user_role", "")).lower()
+        ):
+            session.clear()
             return redirect(url_for("login"))
         return f(*args, **kwargs)
     return decorated
@@ -198,12 +210,26 @@ def _upload_photos_to_s3(files, username: str) -> list[str]:
 
 @app.get("/")
 def landing():
-    return render_template("landing.html", active_page="home")
+    """
+    Root entry point: Every time the system is run, it must be accessed
+    by the administrator logging into the system.
+    """
+    if (
+        not session.get("is_logged_in")
+        or session.get("boot_id") != SYSTEM_BOOT_ID
+        or "admin" not in str(session.get("user_role", "")).lower()
+    ):
+        return redirect(url_for("login"))
+    return redirect(url_for("dashboard"))
 
 
 @app.route("/login", methods=["GET", "POST"])
 def login():
-    if session.get("is_logged_in"):
+    if (
+        session.get("is_logged_in")
+        and session.get("boot_id") == SYSTEM_BOOT_ID
+        and "admin" in str(session.get("user_role", "")).lower()
+    ):
         return redirect(url_for("dashboard"))
 
     message = None
@@ -213,24 +239,29 @@ def login():
         password = request.form.get("access_token", "").strip()
         user     = db.get_user_by_username(username)
 
-        if user and check_password_hash(user["password"], password):
-            if user["status"] != "Active":
+        if user and check_password_hash(user.get("password", ""), password):
+            if user.get("status") != "Active":
                 message = {"type": "error",
                            "text": "Account is inactive. Contact your administrator."}
+            elif "admin" not in str(user.get("role", "")).lower():
+                message = {"type": "error",
+                           "text": "Access denied. Only Administrators can log into and operate this system."}
             else:
+                session.clear()
                 session["operator_id"]  = username
                 session["user_id"]      = user["id"]
                 session["user_role"]    = user["role"]
                 session["is_logged_in"] = True
-                session.permanent       = True
+                session["boot_id"]      = SYSTEM_BOOT_ID
+                session.permanent       = False
                 db.add_log("Login", username, "Dashboard", "Success",
-                           f"Operator {username} logged in")
+                           f"Administrator {username} logged into system")
                 return redirect(url_for("dashboard"))
         else:
             db.add_log("Login", username or "unknown", "Dashboard", "Failed",
-                       "Invalid credentials")
+                       "Invalid administrator credentials")
             message = {"type": "error",
-                       "text": "Invalid Operator ID or Access Token."}
+                       "text": "Invalid Administrator ID or Access Token."}
 
     return render_template("login.html", active_page="login", message=message,
                            body_class="login-body")
@@ -240,7 +271,7 @@ def login():
 def logout():
     username = session.get("operator_id", "unknown")
     db.add_log("Logout", username, "Dashboard", "Success",
-               f"Operator {username} logged out")
+               f"Administrator {username} logged out")
     session.clear()
     return redirect(url_for("login"))
 

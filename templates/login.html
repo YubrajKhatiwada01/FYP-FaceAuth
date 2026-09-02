@@ -6,11 +6,6 @@
 
 {% block content %}
 <section class="login-page">
-  <a class="login-home-button" href="{{ url_for('landing') }}" aria-label="Back to FaceAuth home page">
-    <span aria-hidden="true">&larr;</span>
-    Home
-  </a>
-
   <div class="login-orbit" aria-hidden="true"></div>
 
   <div class="login-identity">
@@ -19,23 +14,23 @@
       <img src="{{ url_for('static', filename='images/final logo 2.png') }}" alt="FaceAuth Logo" class="logo-light">
     </div>
     <h1>FaceAuth</h1>
-    <p>Facial Authentication System</p>
+    <p>Administrator Authentication Gateway</p>
   </div>
 
   <form class="login-card" method="post" novalidate>
     <input type="hidden" name="csrf_token" value="{{ csrf_token() }}"/>
     <div class="field-row">
-      <label for="operator_id">Operator ID</label>
+      <label for="operator_id">Administrator ID</label>
       <span>Secure_Channel_A</span>
     </div>
     <div class="input-shell">
       <span aria-hidden="true">ID</span>
-      <input id="operator_id" name="operator_id" type="text" placeholder="" autocomplete="username" required>
+      <input id="operator_id" name="operator_id" type="text" placeholder="admin" autocomplete="username" required>
     </div>
 
     <div class="field-row">
-      <label for="access_token">Access Token</label>
-      <span>Encrypted_RSA_4096</span>
+      <label for="access_token">Password / Access Token</label>
+      <span>Encrypted_TLS</span>
     </div>
     <div class="input-shell">
       <svg class="input-icon" width="18" height="18" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2">
@@ -48,12 +43,7 @@
       <p class="form-message {{ message.type }}">{{ message.text }}</p>
     {% endif %}
 
-    <button type="submit" class="btn btn-primary" style="width: 100%; margin: 20px 0 0 0;">Initialize Access</button>
-
-    <div class="login-links">
-      <a href="#">Forgot Protocol?</a>
-      <a href="#">Register Node</a>
-    </div>
+    <button type="submit" class="btn btn-primary" style="width: 100%; margin: 20px 0 0 0;">Login to System</button>
   </form>
 
   <div class="login-status" aria-label="System status">

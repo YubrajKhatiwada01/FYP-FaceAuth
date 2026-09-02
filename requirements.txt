@@ -1,18 +1,22 @@
-# ── Web Framework ─────────────────────────────────────────────────────────────
+# ── Web Application & Server ──────────────────────────────────────────────
 Flask==3.0.3
 Flask-WTF==1.2.1
 Werkzeug==3.1.8
 python-dotenv==1.0.0
 waitress==2.1.2
+requests>=2.31.0
 
-# ── Bluetooth (BLE proximity scanning) ────────────────────────────────────────
+# ── Bluetooth BLE Proximity Scanning ───────────────────────────────────────
 bleak>=0.21.1
 
-# ── Face Recognition (dlib-based) ─────────────────────────────────────────────
-face_recognition
-numpy
-Pillow
+# ── Biometrics & Face Recognition ─────────────────────────────────────────
+# Note: On Windows, dlib requires CMake and Visual Studio C++ Build Tools
+dlib>=19.24.0
+face_recognition>=1.3.0
+numpy>=1.24.0,<2.0.0
+Pillow>=10.0.0
 
-# ── AWS SDK (DynamoDB + S3 + Lambda) ──────────────────────────────────────────
+# ── AWS Cloud Services SDK ────────────────────────────────────────────────
+# Covers DynamoDB, S3, AWS Lambda, AWS IoT Core, and CloudWatch
 boto3>=1.34.0
 botocore>=1.34.0

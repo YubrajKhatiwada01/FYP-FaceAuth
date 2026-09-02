@@ -35,10 +35,7 @@
         <th>Full Name</th>
         <th>Username</th>
         <th>Email</th>
-        <th>Phone</th>
         <th>Role</th>
-        <th>Status</th>
-        <th>Joined</th>
         <th>
           <span style="display:inline-flex;align-items:center;gap:.3rem">
             <svg width="13" height="13" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2">
@@ -52,7 +49,19 @@
     </thead>
     <tbody id="usersTableBody">
       {% for user in users %}
-      <tr data-id="{{ user.id }}">
+      <tr class="user-row" data-id="{{ user.id }}"
+          data-fullname="{{ user.full_name }}"
+          data-username="{{ user.username }}"
+          data-email="{{ user.email or '' }}"
+          data-phone="{{ user.phone or '' }}"
+          data-role="{{ user.role }}"
+          data-status="{{ user.status }}"
+          data-joined="{{ user.created_at[:10] if user.created_at else '' }}"
+          data-mac="{{ user.bluetooth_mac or '' }}"
+          data-photo="{{ user.photo_path or '' }}"
+          data-photos='{{ user.photos|tojson if user.photos else "[]" }}'
+          onclick="openUserDetailsModalFromRow(this)"
+          title="Click to view detailed user information">
 
         <!-- Photo cell -->
         <td>
@@ -75,17 +84,10 @@
           <span class="name-text">{{ user.full_name }}</span>
         </td>
         <td class="mono-text">{{ user.username }}</td>
-        <td class="dim-text">{{ user.email or '—' }}</td>
-        <td class="mono-text">{{ user.phone or '—' }}</td>
+        <td class="mono-text" style="font-size:.8rem">{{ user.email or '—' }}</td>
         <td>
-          <span class="badge badge-{{ user.role|lower|replace(' ','') }}">{{ user.role }}</span>
+          <span class="badge badge-serverroom">{{ user.role }}</span>
         </td>
-        <td>
-          <span class="status-indicator {{ 'active' if user.status == 'Active' else 'inactive' }}">
-            {{ user.status }}
-          </span>
-        </td>
-        <td class="dim-text">{{ user.created_at[:10] if user.created_at else '—' }}</td>
         <!-- BT MAC cell -->
         <td id="btMacCell-{{ user.id }}">
           {% if user.bluetooth_mac %}
@@ -95,7 +97,7 @@
           {% endif %}
         </td>
 
-        <td>
+        <td onclick="event.stopPropagation()">
           <div class="action-buttons">
             <button class="action-btn" title="Edit user"
               data-id="{{ user.id }}"
@@ -104,9 +106,10 @@
               data-email="{{ user.email or '' }}"
               data-phone="{{ user.phone or '' }}"
               data-role="{{ user.role }}"
+              data-serverroom="{{ user.role }}"
               data-status="{{ user.status }}"
               data-photo="{{ user.photo_path or '' }}"
-              data-photos="{{ user.photos|tojson|safe if user.photos else '[]' }}"
+              data-photos='{{ user.photos|tojson if user.photos else "[]" }}'
               onclick="openEditUserModalFromBtn(this)">
               <svg width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2">
                 <path d="M11 4H4a2 2 0 0 0-2 2v14a2 2 0 0 0 2 2h14a2 2 0 0 0 2-2v-7"></path>
@@ -138,7 +141,7 @@
       </tr>
       {% else %}
       <tr id="emptyRow">
-        <td colspan="10" class="empty-state">No users found.</td>
+        <td colspan="7" class="empty-state">No users found.</td>
       </tr>
       {% endfor %}
     </tbody>
@@ -232,24 +235,16 @@
             <input type="text" name="username" class="form-input" placeholder="e.g. jane.doe" required>
           </div>
           <div class="form-group">
-            <label class="form-label">Password <span class="required">*</span></label>
-            <input type="password" name="password" class="form-input" placeholder="Min 6 characters" required
-              minlength="6">
-          </div>
-          <div class="form-group">
-            <label class="form-label">Phone</label>
-            <input type="text" name="phone" class="form-input" placeholder="+601XXXXXXXX">
-          </div>
-          <div class="form-group">
-            <label class="form-label">Email</label>
-            <input type="email" name="email" class="form-input" placeholder="user@example.com">
+            <label class="form-label">Email <span class="required">*</span></label>
+            <input type="email" name="email" class="form-input" placeholder="user@example.com" required>
           </div>
           <div class="form-group">
             <label class="form-label">Role</label>
             <select name="role" class="form-select">
-              <option value="Administrator">Administrator</option>
-              <option value="Operator" selected>Operator</option>
-              <option value="Viewer">Viewer</option>
+              <option value="System Administrator">System Administrator</option>
+              <option value="Network Administrator">Network Administrator</option>
+              <option value="IT Infrastructure Manager">IT Infrastructure Manager</option>
+              <option value="Data Center Technician">Data Center Technician</option>
             </select>
           </div>
           <div class="form-group">
@@ -355,19 +350,16 @@
             <input type="text" id="editUsername" class="form-input" readonly style="opacity:.45;cursor:not-allowed">
           </div>
           <div class="form-group">
-            <label class="form-label">Phone</label>
-            <input type="text" name="phone" id="editPhone" class="form-input">
-          </div>
-          <div class="form-group">
-            <label class="form-label">Email</label>
-            <input type="email" name="email" id="editEmail" class="form-input">
+            <label class="form-label">Email <span class="required">*</span></label>
+            <input type="email" name="email" id="editEmail" class="form-input" required>
           </div>
           <div class="form-group">
             <label class="form-label">Role</label>
             <select name="role" id="editRole" class="form-select">
-              <option value="Administrator">Administrator</option>
-              <option value="Operator">Operator</option>
-              <option value="Viewer">Viewer</option>
+              <option value="System Administrator">System Administrator</option>
+              <option value="Network Administrator">Network Administrator</option>
+              <option value="IT Infrastructure Manager">IT Infrastructure Manager</option>
+              <option value="Data Center Technician">Data Center Technician</option>
             </select>
           </div>
           <div class="form-group">
@@ -420,8 +412,128 @@
 
 
 <!-- ══════════════════════════════════════════════════════════════════════
+     USER DETAILS MODAL (ROW CLICK)
+     ══════════════════════════════════════════════════════════════════════ -->
+<div class="modal admin-profile-modal" id="userDetailsModal" role="dialog" aria-modal="true" aria-labelledby="userDetailsTitle">
+  <div class="modal-content glass-card">
+    <div class="modal-header">
+      <div class="modal-title-with-badge">
+        <h3 id="userDetailsTitle">User Profile Details</h3>
+        <span class="chip chip-success" id="detailsStatusChip">Active</span>
+      </div>
+      <button class="modal-close" onclick="closeUserDetailsModal()" aria-label="Close">&times;</button>
+    </div>
+
+    <div class="modal-body">
+      <!-- User Banner -->
+      <div class="admin-profile-banner">
+        <div class="admin-profile-avatar-container" id="detailsAvatarContainer">
+          <div class="admin-modal-avatar" id="detailsLetterAvatar">U</div>
+          <span class="pulse-indicator"></span>
+        </div>
+        <div class="admin-modal-details">
+          <h2 id="detailsHeaderFullName">User Name</h2>
+          <p class="admin-modal-role" id="detailsHeaderUsername">@username</p>
+          <div class="admin-status-chips">
+            <span class="chip chip-cyan" id="detailsRoleChip">Role: General</span>
+            <span class="chip chip-purple" id="detailsBtMacChip">BT MAC: Not set</span>
+          </div>
+        </div>
+      </div>
+
+      <!-- Detail Cards Grid -->
+      <div class="admin-info-grid">
+        <div class="info-card">
+          <div class="info-card-header">
+            <svg width="18" height="18" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2">
+              <path d="M20 21v-2a4 4 0 0 0-4-4H8a4 4 0 0 0-4 4v2"></path>
+              <circle cx="12" cy="7" r="4"></circle>
+            </svg>
+            <span>Personal & Account Info</span>
+          </div>
+          <div class="info-card-body">
+            <div class="info-row">
+              <label>Full Name:</label>
+              <strong id="detailsCardFullName">—</strong>
+            </div>
+            <div class="info-row">
+              <label>Username:</label>
+              <span id="detailsCardUsername" class="mono-text">—</span>
+            </div>
+            <div class="info-row">
+              <label>Assigned System Role:</label>
+              <span id="detailsCardRole" class="badge-accent">—</span>
+            </div>
+            <div class="info-row">
+              <label>Account Status:</label>
+              <span id="detailsCardStatus">—</span>
+            </div>
+          </div>
+        </div>
+
+        <div class="info-card">
+          <div class="info-card-header">
+            <svg width="18" height="18" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2">
+              <path d="M22 16.92v3a2 2 0 0 1-2.18 2 19.79 19.79 0 0 1-8.63-3.07 19.5 19.5 0 0 1-6-6 19.79 19.79 0 0 1-3.07-8.67A2 2 0 0 1 4.11 2h3a2 2 0 0 1 2 1.72 12.84 12.84 0 0 0 .7 2.81 2 2 0 0 1-.45 2.11L8.09 9.91a16 16 0 0 0 6 6l1.27-1.27a2 2 0 0 1 2.11-.45 12.84 12.84 0 0 0 2.81.7A2 2 0 0 1 22 16.92z"/>
+            </svg>
+            <span>Contact & 2FA Setup</span>
+          </div>
+          <div class="info-card-body">
+            <div class="info-row">
+              <label>Email Address:</label>
+              <span id="detailsCardEmail">—</span>
+            </div>
+
+            <div class="info-row">
+              <label>Bluetooth MAC (2FA):</label>
+              <code id="detailsCardBtMac" style="color:#06b6d4;font-size:.84rem;letter-spacing:.03em">Not set</code>
+            </div>
+            <div class="info-row">
+              <label>Registration Date:</label>
+              <span id="detailsCardJoined" class="mono-text">—</span>
+            </div>
+          </div>
+        </div>
+
+        <!-- Enrolled Face Samples Grid Card -->
+        <div class="info-card full-width">
+          <div class="info-card-header">
+            <svg width="18" height="18" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2">
+              <path d="M23 19a2 2 0 0 1-2 2H3a2 2 0 0 1-2-2V8a2 2 0 0 1 2-2h4l2-3h6l2 3h4a2 2 0 0 1 2 2z"></path>
+              <circle cx="12" cy="13" r="4"></circle>
+            </svg>
+            <span>Enrolled Facial Recognition Samples</span>
+            <span class="samples-count-label" id="detailsSamplesCountLabel" style="margin-left:auto">0 samples enrolled</span>
+          </div>
+          <div class="info-card-body">
+            <div id="detailsSamplesContainer">
+              <span class="dim-text" style="font-size:0.85rem">No facial training photos uploaded yet.</span>
+            </div>
+          </div>
+        </div>
+      </div>
+    </div>
+
+    <div class="modal-footer">
+      <button type="button" class="btn btn-secondary" onclick="closeUserDetailsModal()">Close</button>
+      <button type="button" class="btn btn-primary" id="detailsModalEditBtn">
+        <svg width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2">
+          <path d="M11 4H4a2 2 0 0 0-2 2v14a2 2 0 0 0 2 2h14a2 2 0 0 0 2-2v-7"></path>
+          <path d="M18.5 2.5a2.121 2.121 0 0 1 3 3L12 15l-4 1 1-4 9.5-9.5z"></path>
+        </svg>
+        Edit User Profile
+      </button>
+    </div>
+  </div>
+</div>
+
+
+<!-- ══════════════════════════════════════════════════════════════════════
      SCRIPTS
      ══════════════════════════════════════════════════════════════════════ -->
+<style>
+  @keyframes spin { to { transform: rotate(360deg); } }
+</style>
 <script>
   // ── Toast ─────────────────────────────────────────────────────────────────
   function showToast(msg, type = 'success') {
@@ -432,10 +544,101 @@
     setTimeout(() => { t.style.display = 'none'; }, 3500);
   }
 
+  // ── Row Click & User Details Modal Logic ────────────────────────────────────
+  function openUserDetailsModalFromRow(row) {
+    const d = row.dataset;
+    let photos = [];
+    try { photos = JSON.parse(d.photos || '[]'); } catch(e) {}
+    openUserDetailsModal(d.id, d.fullname, d.username, d.email, d.phone, d.role, d.status, d.joined, d.mac, d.photo, photos);
+  }
+
+  function openUserDetailsModal(id, fullname, username, email, phone, role, status, joined, mac, photo, photos) {
+    const modal = document.getElementById('userDetailsModal');
+    if (!modal) return;
+
+    document.getElementById('detailsHeaderFullName').textContent = fullname || 'User';
+    document.getElementById('detailsHeaderUsername').textContent = '@' + (username || '');
+    
+    const statusChip = document.getElementById('detailsStatusChip');
+    if (statusChip) {
+      statusChip.textContent = status || 'Active';
+      statusChip.className = status === 'Active' ? 'chip chip-success' : 'chip chip-danger';
+    }
+
+    document.getElementById('detailsRoleChip').textContent = 'Role: ' + (role || 'General');
+    document.getElementById('detailsBtMacChip').textContent = mac ? ('BT MAC: ' + mac) : 'BT MAC: Not set';
+
+    const avatarWrap = document.getElementById('detailsAvatarContainer');
+    if (photo) {
+      avatarWrap.innerHTML = `
+        <img src="/uploads/${photo}" alt="${fullname}" class="user-details-main-img" />
+        <span class="pulse-indicator"></span>
+      `;
+    } else {
+      avatarWrap.innerHTML = `
+        <div class="admin-modal-avatar">${(fullname || 'U')[0].toUpperCase()}</div>
+        <span class="pulse-indicator"></span>
+      `;
+    }
+
+    document.getElementById('detailsCardFullName').textContent = fullname || '—';
+    document.getElementById('detailsCardUsername').textContent = username || '—';
+    document.getElementById('detailsCardRole').textContent = role || 'General';
+    document.getElementById('detailsCardStatus').textContent = status || 'Active';
+    document.getElementById('detailsCardEmail').textContent = email || '—';
+    document.getElementById('detailsCardBtMac').textContent = mac || 'Not set';
+    document.getElementById('detailsCardJoined').textContent = joined || '—';
+
+    const countLabel = document.getElementById('detailsSamplesCountLabel');
+    const samplesContainer = document.getElementById('detailsSamplesContainer');
+    
+    let allPhotos = [...photos];
+    if (photo && !allPhotos.includes(photo)) {
+      allPhotos.unshift(photo);
+    }
+
+    if (countLabel) {
+      countLabel.textContent = `${allPhotos.length} sample${allPhotos.length === 1 ? '' : 's'} enrolled`;
+    }
+
+    if (samplesContainer) {
+      if (allPhotos.length === 0) {
+        samplesContainer.innerHTML = `<span class="dim-text" style="font-size:0.85rem">No facial training photos uploaded yet.</span>`;
+      } else {
+        samplesContainer.innerHTML = `
+          <div class="user-details-samples-grid">
+            ${allPhotos.map(p => `
+              <div class="details-sample-card">
+                <img src="/uploads/${p}" alt="Training Sample" />
+              </div>
+            `).join('')}
+          </div>
+        `;
+      }
+    }
+
+    const editBtn = document.getElementById('detailsModalEditBtn');
+    if (editBtn) {
+      editBtn.onclick = () => {
+        closeUserDetailsModal();
+        openEditUserModal(id, fullname, username, email, role, status, photo, photos);
+      };
+    }
+
+    modal.classList.add('active');
+  }
+
+  function closeUserDetailsModal() {
+    const modal = document.getElementById('userDetailsModal');
+    if (modal) modal.classList.remove('active');
+  }
+
   // ── Button data-attribute wrappers ────────────────────────────────────────
   function openEditUserModalFromBtn(btn) {
     const d = btn.dataset;
-    openEditUserModal(d.id, d.fullname, d.username, d.email, d.phone, d.role, d.status, d.photo);
+    let existingPhotos = [];
+    try { existingPhotos = JSON.parse(d.photos || '[]'); } catch(e) {}
+    openEditUserModal(d.id, d.fullname, d.username, d.email, d.role, d.status, d.photo, existingPhotos);
   }
   function openDeleteUserModalFromBtn(btn) {
     const d = btn.dataset;
@@ -468,6 +671,7 @@
   // ── Multiple Samples & Webcam Logic ────────────────────────────────────────
   let addSamplesList = [];
   let editSamplesList = [];
+  let editDeletedKeys = [];   // S3 keys of existing photos removed in the edit modal
   let webcamStream = null;
   let captureInterval = null;
 
@@ -658,6 +862,10 @@
 
   function removeSample(prefix, index) {
     const list = prefix === 'add' ? addSamplesList : editSamplesList;
+    // Track deleted existing S3 photos so the backend can remove them from S3
+    if (prefix === 'edit' && list[index] && list[index].isExisting && list[index].s3Key) {
+      editDeletedKeys.push(list[index].s3Key);
+    }
     list.splice(index, 1);
     renderSamples(prefix);
   }
@@ -678,21 +886,25 @@
     const form = document.getElementById('addUserForm');
     if (!form.checkValidity()) { form.reportValidity(); return; }
 
-    if (addSamplesList.length < 5) {
-      if (!confirm(`You have only uploaded/captured ${addSamplesList.length} sample images. Enrolling 10-15 images is highly recommended for best facial recognition accuracy. Do you want to proceed?`)) {
-        return;
-      }
+    const formData = new FormData(form);
+    if (typeof addSamplesList !== 'undefined' && addSamplesList.length > 0) {
+      addSamplesList.forEach((item, index) => {
+        if (item.file) {
+          formData.append('samples', item.file);
+        } else if (item.dataUrl) {
+          try {
+            const blob = dataURLtoBlob(item.dataUrl);
+            formData.append('samples', blob, `captured_sample_${index}.jpg`);
+          } catch(e) {
+            console.warn("Could not parse dataUrl to blob", e);
+          }
+        }
+      });
     }
 
-    const formData = new FormData(form);
-    addSamplesList.forEach((item, index) => {
-      if (item.file) {
-        formData.append('samples', item.file);
-      } else if (item.dataUrl) {
-        const blob = dataURLtoBlob(item.dataUrl);
-        formData.append('samples', blob, `captured_sample_${index}.jpg`);
-      }
-    });
+    const saveBtn = document.querySelector('#addUserModal .modal-footer .btn-primary');
+    const origText = saveBtn ? saveBtn.innerHTML : 'Create User';
+    if (saveBtn) { saveBtn.disabled = true; saveBtn.innerHTML = 'Creating...'; }
 
     fetch('{{ url_for("add_user") }}', { method: 'POST', body: formData })
       .then(r => r.json())
@@ -704,59 +916,74 @@
         } else {
           showToast(res.error || 'Error creating user.', 'error');
         }
+      })
+      .catch(err => {
+        showToast('Network error: ' + err.message, 'error');
+      })
+      .finally(() => {
+        if (saveBtn) { saveBtn.disabled = false; saveBtn.innerHTML = origText; }
       });
   }
 
   // ── Edit User ──────────────────────────────────────────────────────────────
-  function openEditUserModal(id, fullName, username, email, phone, role, status, photoPath) {
+  function openEditUserModal(id, fullName, username, email, role, status, photoPath, existingPhotos) {
     document.getElementById('editUserId').value = id;
     document.getElementById('editFullName').value = fullName;
     document.getElementById('editUsername').value = username;
     document.getElementById('editEmail').value = email;
-    document.getElementById('editPhone').value = phone;
     document.getElementById('editRole').value = role;
     document.getElementById('editStatus').value = status;
 
     editSamplesList = [];
+    editDeletedKeys  = [];   // reset deleted-keys tracker on every open
     stopWebcam('edit');
 
-    // Fetch existing user to load their sample photos if any
+    // Show spinner while fetching the latest photos from the server
     const grid = document.getElementById('editSamplesGrid');
-    grid.innerHTML = '<div class="samples-empty-placeholder"><div class="spin" style="width:20px;height:20px;border:2px solid var(--cyan);border-top-color:transparent;border-radius:50%"></div> Loading photos…</div>';
-    
-    // We can query custom details or just download the photos list from app.py or display current thumbnail
-    if (photoPath) {
-      // For editing: we will pull user data to see if photos array has items
-      // For now, let's load the primary photo
-      editSamplesList = [{
-        dataUrl: '/uploads/' + photoPath,
-        file: null,
-        isExisting: true
-      }];
-    }
-    
-    // Check if there is photos array
-    const userRow = document.querySelector(`#usersTableBody tr[data-id="${id}"]`);
-    // Alternatively fetch the photos list from user row dataset or a quick api call.
-    // To make it easy, we can just fetch the user detail via custom script or pass them through a helper attribute.
-    // Let's call standard fetch to get user info if needed, but since we have row datasets:
-    // Let's add user data attribute to action button in users.html
-    const btn = document.querySelector(`.action-btn[data-id="${id}"][title="Edit user"]`);
-    if (btn && btn.dataset.photos) {
-      try {
-        const photoKeys = JSON.parse(btn.dataset.photos);
-        if (photoKeys && photoKeys.length > 0) {
-          editSamplesList = photoKeys.map(k => ({
+    grid.innerHTML = `<div class="samples-empty-placeholder">
+      <div style="width:22px;height:22px;border:2px solid var(--cyan);border-top-color:transparent;border-radius:50%;animation:spin 0.7s linear infinite;"></div>
+      Loading enrolled photos…
+    </div>`;
+
+    document.getElementById('editUserModal').classList.add('active');
+
+    // Always fetch the freshest photo list from the server
+    fetch(`/users/${id}/photos`)
+      .then(r => {
+        if (!r.ok) throw new Error('HTTP ' + r.status);
+        return r.json();
+      })
+      .then(res => {
+        if (res.success && res.photos && res.photos.length > 0) {
+          editSamplesList = res.photos.map(k => ({
             dataUrl: '/uploads/' + k,
             file: null,
-            isExisting: true
+            isExisting: true,
+            s3Key: k
           }));
+        } else if (photoPath) {
+          editSamplesList = [{
+            dataUrl: '/uploads/' + photoPath,
+            file: null,
+            isExisting: true,
+            s3Key: photoPath
+          }];
         }
-      } catch(e) {}
-    }
-    
-    renderSamples('edit');
-    document.getElementById('editUserModal').classList.add('active');
+        renderSamples('edit');
+      })
+      .catch(err => {
+        console.warn('[FaceAuth] Photo fetch failed:', err, '— falling back to HTML attribute data');
+        // Fallback: use data from the HTML attribute (single-quote fix makes this reliable now)
+        const photos = (existingPhotos && existingPhotos.length > 0) ? existingPhotos
+                     : (photoPath ? [photoPath] : []);
+        editSamplesList = photos.map(k => ({
+          dataUrl: '/uploads/' + k,
+          file: null,
+          isExisting: true,
+          s3Key: k
+        }));
+        renderSamples('edit');
+      });
   }
   function closeEditUserModal() {
     stopWebcam('edit');
@@ -765,14 +992,22 @@
   function submitEditUser() {
     const form = document.getElementById('editUserForm');
     if (!form.checkValidity()) { form.reportValidity(); return; }
-    
+
     const userId = document.getElementById('editUserId').value;
     const formData = new FormData(form);
 
+    // Tell the backend which existing S3 photos were removed
+    editDeletedKeys.forEach(key => formData.append('deleted_keys', key));
+
     editSamplesList.forEach((item, index) => {
-      if (item.file) {
+      if (item.isExisting && item.s3Key) {
+        // Existing photo that was NOT deleted — tell backend to keep it
+        formData.append('kept_keys', item.s3Key);
+      } else if (item.file) {
+        // Newly uploaded file
         formData.append('samples', item.file);
       } else if (item.dataUrl && !item.isExisting) {
+        // Webcam-captured frame
         const blob = dataURLtoBlob(item.dataUrl);
         formData.append('samples', blob, `captured_sample_${index}.jpg`);
       }
@@ -940,15 +1175,19 @@
         return;
       }
 
-      if (data.devices.length === 0) {
-        list.innerHTML = '<div class="bt-device-empty">No Bluetooth devices detected nearby.<br>Ensure your phone\'s Bluetooth is ON and not in stealth mode.</div>';
-        counter.textContent = '0 devices found';
+      // ── FILTER: only show devices that are actually nearby (have a real BLE RSSI)
+      // Devices with rssi === null are registry-paired but not currently in range.
+      const nearbyDevices = data.devices.filter(dev => dev.rssi !== null && dev.rssi !== undefined);
+
+      if (nearbyDevices.length === 0) {
+        list.innerHTML = '<div class="bt-device-empty">No Bluetooth devices detected in range.<br>Ensure your phone\'s Bluetooth is ON and nearby.</div>';
+        counter.textContent = '0 devices in range';
         return;
       }
 
-      counter.textContent = data.message || `${data.devices.length} device(s) found`;
+      counter.textContent = `${nearbyDevices.length} device(s) in range`;
 
-      data.devices.forEach(dev => {
+      nearbyDevices.forEach(dev => {
         const isCurrent   = dev.mac === document.getElementById('btMacInput').value.trim().toUpperCase();
         const isConnected = dev.connected;
         const hasRssi     = dev.rssi !== null && dev.rssi !== undefined;

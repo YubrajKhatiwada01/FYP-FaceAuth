@@ -1,0 +1,219 @@
+﻿/* hero.css - Hero Section, Feature Cards, Architecture, Flow Panel, System Strip */
+
+.hero {
+  position: relative;
+  display: flex;
+  align-items: center;
+  min-height: calc(100vh - 78px);
+  padding: clamp(60px, 8vw, 108px) clamp(18px, 5vw, 72px);
+  isolation: isolate;
+}
+
+.hero-bg {
+  position: absolute;
+  inset: 0;
+  z-index: -3;
+  background-image:
+    linear-gradient(90deg, rgba(13, 15, 16, 0.22), rgba(13, 15, 16, 0.9) 58%, #0d0f10),
+    linear-gradient(180deg, rgba(13, 15, 16, 0.2), #0d0f10 92%),
+    url("../images/faceauth-scan-reference.png");
+  background-position: center;
+  background-size: cover;
+  opacity: 0.78;
+}
+
+.hero-grid {
+  position: absolute;
+  inset: 0;
+  z-index: -2;
+  background:
+    linear-gradient(90deg, rgba(21, 213, 238, 0.08) 1px, transparent 1px),
+    linear-gradient(180deg, rgba(21, 213, 238, 0.06) 1px, transparent 1px);
+  background-size: 96px 96px;
+  mask-image: linear-gradient(90deg, #000, transparent 70%);
+}
+
+.hero-content {
+  width: min(760px, 100%);
+}
+
+.eyebrow {
+  margin: 0 0 14px;
+  color: var(--cyan);
+  font-family: var(--mono);
+  font-size: 0.82rem;
+  font-weight: 700;
+  letter-spacing: 0.12em;
+  text-transform: uppercase;
+}
+
+.hero h1 {
+  margin: 0;
+  color: #ffffff;
+  font-size: clamp(4rem, 12vw, 9.8rem);
+  line-height: 0.86;
+  letter-spacing: 0;
+}
+
+.hero-lede {
+  max-width: 680px;
+  margin: 28px 0 0;
+  color: #d9e2e5;
+  font-size: clamp(1.06rem, 2.1vw, 1.58rem);
+  line-height: 1.5;
+}
+
+.hero-actions {
+  display: flex;
+  flex-wrap: wrap;
+  gap: 14px;
+  margin-top: 34px;
+}
+
+.system-strip {
+  display: grid;
+  grid-template-columns: repeat(3, minmax(0, 1fr));
+  gap: 1px;
+  width: min(780px, 100%);
+  margin-top: 44px;
+  border: 1px solid var(--line);
+  border-radius: 8px;
+  overflow: hidden;
+  background: rgba(186, 247, 255, 0.12);
+  box-shadow: var(--shadow);
+}
+
+.system-strip div,
+.login-status div {
+  padding: 18px;
+  background: rgba(18, 21, 22, 0.88);
+}
+
+.system-strip strong,
+.login-status strong {
+  display: block;
+  color: #ffffff;
+  font-family: var(--mono);
+  font-size: 0.86rem;
+  letter-spacing: 0.08em;
+  text-transform: uppercase;
+}
+
+.system-strip small,
+.login-status small {
+  display: block;
+  margin-top: 8px;
+  color: #819198;
+  font-family: var(--mono);
+  font-size: 0.74rem;
+}
+
+.pulse-dot {
+  display: inline-block;
+  width: 8px;
+  height: 8px;
+  margin-right: 8px;
+  border-radius: 50%;
+  background: var(--ok);
+  box-shadow: 0 0 16px rgba(57, 232, 143, 0.78);
+}
+
+.section {
+  display: grid;
+  gap: 36px;
+  padding: clamp(54px, 8vw, 96px) clamp(18px, 5vw, 72px);
+  border-top: 1px solid rgba(255, 255, 255, 0.07);
+}
+
+.section-heading {
+  max-width: 760px;
+}
+
+.section h2 {
+  margin: 0;
+  font-size: clamp(2rem, 5vw, 4rem);
+  line-height: 1;
+  letter-spacing: 0;
+}
+
+.feature-grid {
+  display: grid;
+  grid-template-columns: repeat(3, minmax(0, 1fr));
+  gap: 18px;
+}
+
+.feature-card,
+.flow-panel,
+.login-card {
+  border: 1px solid rgba(255, 255, 255, 0.12);
+  border-radius: 8px;
+  background: linear-gradient(135deg, rgba(255, 255, 255, 0.055), rgba(255, 255, 255, 0.018));
+  box-shadow: var(--shadow);
+}
+
+.feature-card {
+  min-height: 260px;
+  padding: 28px;
+}
+
+.feature-icon {
+  display: inline-flex;
+  align-items: center;
+  justify-content: center;
+  width: 52px;
+  height: 52px;
+  border: 1px solid var(--line);
+  border-radius: 8px;
+  color: var(--cyan-soft);
+  background: rgba(21, 213, 238, 0.1);
+  font-family: var(--mono);
+  font-weight: 800;
+}
+
+.feature-card h3 {
+  margin: 28px 0 12px;
+  font-size: 1.34rem;
+}
+
+.feature-card p,
+.architecture-copy p {
+  margin: 0;
+  color: #bac5c9;
+  font-size: 1rem;
+  line-height: 1.7;
+}
+
+.architecture {
+  grid-template-columns: minmax(0, 0.82fr) minmax(360px, 1fr);
+  align-items: center;
+  background: #0a0c0d;
+}
+
+.flow-panel {
+  display: grid;
+  grid-template-columns: 1fr 42px 1fr 42px 1fr 42px 1fr;
+  align-items: center;
+  min-height: 230px;
+  padding: 26px;
+}
+
+.flow-node {
+  display: grid;
+  min-height: 82px;
+  place-items: center;
+  border: 1px solid var(--line);
+  border-radius: 8px;
+  color: #f4fbfc;
+  background: rgba(8, 10, 11, 0.72);
+  font-family: var(--mono);
+  font-size: 0.9rem;
+  font-weight: 700;
+  text-align: center;
+}
+
+.flow-line {
+  height: 2px;
+  background: var(--cyan);
+  box-shadow: 0 0 16px rgba(21, 213, 238, 0.5);
+}
+

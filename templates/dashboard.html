@@ -1,120 +1,796 @@
 {% extends "dashboard_base.html" %}
 
 {% block title %}FaceAuth | Dashboard{% endblock %}
-
 {% block dashboard_title %}Dashboard{% endblock %}
-{% block dashboard_subtitle %}Welcome back, {{ operator_id }}{% endblock %}
+{% block dashboard_subtitle %}Welcome back, {{ operator_id }} - Server Room Control Center{% endblock %}
 {% block dashboard_notifications_count %}3{% endblock %}
 
 {% block dashboard_content %}
-<!-- Welcome Card -->
-<section class="welcome-card">
-  <div class="welcome-content">
-    <h2>Welcome to FaceAuth Dashboard</h2>
-    <p>Monitor your facial recognition system, manage access control, and view real-time analytics.</p>
+
+<!-- ===== Stat Cards ===== -->
+<section class="db-stats-row">
+
+  <div class="db-stat-card db-stat-granted">
+    <div class="db-stat-icon">
+      <svg width="22" height="22" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2">
+        <path d="M22 11.08V12a10 10 0 1 1-5.93-9.14"/><polyline points="22 4 12 14.01 9 11.01"/>
+      </svg>
+    </div>
+    <div class="db-stat-body">
+      <span class="db-stat-label">Access Granted</span>
+      <strong class="db-stat-num" data-target="{{ stats.access_granted }}">0</strong>
+      <span class="db-stat-sub">All-time successful entries</span>
+    </div>
+    <div class="db-stat-glow db-glow-green"></div>
   </div>
-  <div class="welcome-icon">
-    <svg width="64" height="64" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.5">
-      <path d="M20 21v-2a4 4 0 0 0-4-4H8a4 4 0 0 0-4 4v2"></path>
-      <circle cx="12" cy="7" r="4"></circle>
-    </svg>
+
+  <div class="db-stat-card db-stat-denied">
+    <div class="db-stat-icon">
+      <svg width="22" height="22" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2">
+        <circle cx="12" cy="12" r="10"/><line x1="15" y1="9" x2="9" y2="15"/><line x1="9" y1="9" x2="15" y2="15"/>
+      </svg>
+    </div>
+    <div class="db-stat-body">
+      <span class="db-stat-label">Access Denied</span>
+      <strong class="db-stat-num" data-target="{{ stats.access_denied }}">0</strong>
+      <span class="db-stat-sub">Blocked / failed attempts</span>
+    </div>
+    <div class="db-stat-glow db-glow-red"></div>
   </div>
+
+  <div class="db-stat-card db-stat-users">
+    <div class="db-stat-icon">
+      <svg width="22" height="22" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2">
+        <path d="M17 21v-2a4 4 0 0 0-4-4H5a4 4 0 0 0-4 4v2"/><circle cx="9" cy="7" r="4"/>
+        <path d="M23 21v-2a4 4 0 0 0-3-3.87"/><path d="M16 3.13a4 4 0 0 1 0 7.75"/>
+      </svg>
+    </div>
+    <div class="db-stat-body">
+      <span class="db-stat-label">Active Users</span>
+      <strong class="db-stat-num" data-target="{{ stats.active_users }}">0</strong>
+      <span class="db-stat-sub">Enrolled operators</span>
+    </div>
+    <div class="db-stat-glow db-glow-blue"></div>
+  </div>
+
+  <div class="db-stat-card db-stat-rate">
+    <div class="db-stat-icon">
+      <svg width="22" height="22" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2">
+        <polyline points="23 6 13.5 15.5 8.5 10.5 1 17"/><polyline points="17 6 23 6 23 12"/>
+      </svg>
+    </div>
+    <div class="db-stat-body">
+      <span class="db-stat-label">Success Rate</span>
+      <strong class="db-stat-num" data-target="{{ stats.success_rate }}" data-suffix="%">0%</strong>
+      <span class="db-stat-sub">Authentication accuracy</span>
+    </div>
+    <div class="db-stat-glow db-glow-cyan"></div>
+  </div>
+
 </section>
 
-<!-- Stats Grid -->
-<section class="stats-grid">
-  <div class="stat-card">
-    <div class="stat-icon access">
-      <svg width="24" height="24" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2">
-        <polyline points="22 4 2 4 2 14 22 14 22 4"></polyline>
-        <line x1="2" y1="10" x2="22" y2="10"></line>
-        <circle cx="12" cy="21" r="1"></circle>
-      </svg>
-    </div>
-    <div class="stat-content">
-      <p class="stat-label">Access Granted</p>
-      <h3 class="stat-value">{{ stats.access_granted }}</h3>
-      <p class="stat-change positive">Total all-time events</p>
-    </div>
-  </div>
+<!-- ===== Charts Row ===== -->
+<section class="db-charts-row">
 
-  <div class="stat-card">
-    <div class="stat-icon denied">
-      <svg width="24" height="24" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2">
-        <circle cx="12" cy="12" r="10"></circle>
-        <line x1="15" y1="9" x2="9" y2="15"></line>
-        <line x1="9" y1="9" x2="15" y2="15"></line>
-      </svg>
-    </div>
-    <div class="stat-content">
-      <p class="stat-label">Access Denied</p>
-      <h3 class="stat-value">{{ stats.access_denied }}</h3>
-      <p class="stat-change neutral">Requires review</p>
-    </div>
-  </div>
-
-  <div class="stat-card">
-    <div class="stat-icon uptime">
-      <svg width="24" height="24" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2">
-        <polyline points="23 6 13.5 15.5 8.5 10.5 1 17"></polyline>
-        <polyline points="17 6 23 6 23 12"></polyline>
-      </svg>
-    </div>
-    <div class="stat-content">
-      <p class="stat-label">Active Access Points</p>
-      <h3 class="stat-value">{{ stats.active_points }}</h3>
-      <p class="stat-change positive">All systems operational</p>
-    </div>
-  </div>
-
-  <div class="stat-card">
-    <div class="stat-icon users">
-      <svg width="24" height="24" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2">
-        <path d="M17 21v-2a4 4 0 0 0-4-4H5a4 4 0 0 0-4 4v2"></path>
-        <circle cx="9" cy="7" r="4"></circle>
-        <path d="M23 21v-2a4 4 0 0 0-3-3.87"></path>
-        <path d="M16 3.13a4 4 0 0 1 0 7.75"></path>
-      </svg>
-    </div>
-    <div class="stat-content">
-      <p class="stat-label">Active Users</p>
-      <h3 class="stat-value">{{ stats.active_users }}</h3>
-      <p class="stat-change positive">Registered operators</p>
-    </div>
-  </div>
-</section>
-
-<!-- Activity Section -->
-<section class="activity-section">
-  <h2>Recent Activity</h2>
-  <div class="activity-list">
-    {% for log in recent_logs %}
-    <div class="activity-item">
-      <div class="activity-icon
-        {% if log.status == 'Success' or log.status == 'Completed' %}success
-        {% elif log.status == 'Failed' %}warning
-        {% else %}info{% endif %}">
-        {% if log.status == 'Success' or log.status == 'Completed' %}
-        <svg width="20" height="20" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2">
-          <polyline points="20 6 9 17 4 12"></polyline>
-        </svg>
-        {% else %}
-        <svg width="20" height="20" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2">
-          <circle cx="12" cy="12" r="10"></circle>
-          <line x1="12" y1="16" x2="12" y2="12"></line>
-          <line x1="12" y1="8" x2="12.01" y2="8"></line>
-        </svg>
-        {% endif %}
+  <!-- Donut - Access Success Rate -->
+  <div class="db-chart-card db-donut-card">
+    <div class="db-chart-header">
+      <div>
+        <h3 class="db-chart-title">Access Overview</h3>
+        <p class="db-chart-sub">Granted vs Denied &mdash; All Time</p>
       </div>
-      <div class="activity-content">
-        <p class="activity-title">{{ log.event_type }}</p>
-        <p class="activity-desc">{{ log.details or (log.username ~ ' — ' ~ (log.access_point or 'System')) }}</p>
-        <p class="activity-time">{{ log.timestamp }}</p>
+      <span class="db-chart-badge">LIVE</span>
+    </div>
+    <div class="db-donut-wrap">
+      <canvas id="donutChart" width="220" height="220"></canvas>
+      <div class="db-donut-centre">
+        <span class="db-donut-pct">{{ stats.success_rate }}%</span>
+        <span class="db-donut-lbl">Success</span>
       </div>
     </div>
-    {% else %}
-    <p style="color:var(--muted);padding:16px 0">No recent activity recorded.</p>
-    {% endfor %}
+    <div class="db-donut-legend">
+      <div class="db-legend-item">
+        <span class="db-legend-dot" style="background:#39e88f"></span>
+        <span>Granted <strong>{{ stats.access_granted }}</strong></span>
+      </div>
+      <div class="db-legend-item">
+        <span class="db-legend-dot" style="background:#ff6b6b"></span>
+        <span>Denied <strong>{{ stats.access_denied }}</strong></span>
+      </div>
+      <div class="db-legend-item">
+        <span class="db-legend-dot" style="background:#7ab8ff"></span>
+        <span>Active Points <strong>{{ stats.active_points }}</strong></span>
+      </div>
+    </div>
+  </div>
+
+  <!-- Bar Chart - 7-Day Trend -->
+  <div class="db-chart-card db-bar-card">
+    <div class="db-chart-header">
+      <div>
+        <h3 class="db-chart-title">7-Day Access Trend</h3>
+        <p class="db-chart-sub">Daily granted &amp; denied breakdown</p>
+      </div>
+      <div class="db-bar-legend">
+        <span><i style="background:#39e88f"></i> Granted</span>
+        <span><i style="background:#ff6b6b"></i> Denied</span>
+      </div>
+    </div>
+    <div class="db-bar-wrap">
+      <canvas id="barChart"></canvas>
+    </div>
+  </div>
+
+</section>
+
+<!-- ===== Second Charts Row ===== -->
+<section class="db-charts-row db-charts-row-2">
+
+  <!-- Horizontal bar - event type breakdown -->
+  <div class="db-chart-card db-hbar-card">
+    <div class="db-chart-header">
+      <div>
+        <h3 class="db-chart-title">Event Breakdown</h3>
+        <p class="db-chart-sub">All event types by frequency</p>
+      </div>
+    </div>
+    <div class="db-hbar-wrap">
+      <canvas id="hbarChart"></canvas>
+    </div>
+  </div>
+
+  <!-- Activity Feed -->
+  <div class="db-chart-card db-activity-card">
+    <div class="db-chart-header">
+      <div>
+        <h3 class="db-chart-title">Recent Activity</h3>
+        <p class="db-chart-sub">Latest system events</p>
+      </div>
+      <a href="{{ url_for('logs') }}" class="db-view-all">View All &rarr;</a>
+    </div>
+    <div class="db-activity-feed">
+      {% for log in recent_logs %}
+      <div class="db-activity-item">
+        <div class="db-act-dot
+          {% if log.status == 'Success' or log.status == 'Completed' %}db-dot-green
+          {% elif log.status == 'Failed' %}db-dot-red
+          {% else %}db-dot-cyan{% endif %}"></div>
+        <div class="db-act-body">
+          <div class="db-act-top">
+            <span class="db-act-event">{{ (log.event_type or '').replace('[Lambda] ', '').strip() }}</span>
+            <span class="db-act-time">{{ log.timestamp[:16] if log.timestamp else '-' }}</span>
+          </div>
+          <span class="db-act-user">{{ log.username }}
+            {% if log.access_point %}<span class="db-act-sep">&bull;</span> {{ log.access_point }}{% endif %}
+          </span>
+        </div>
+      </div>
+      {% else %}
+      <p class="db-empty">No activity yet.</p>
+      {% endfor %}
+    </div>
+  </div>
+
+</section>
+
+<!-- ===== Access Points Quick-View ===== -->
+<section class="db-chart-card db-points-card">
+  <div class="db-chart-header">
+    <div>
+      <h3 class="db-chart-title">System Status</h3>
+      <p class="db-chart-sub">Active access points &amp; enrollments</p>
+    </div>
+  </div>
+  <div class="db-status-row">
+    <div class="db-status-item">
+      <svg width="20" height="20" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2">
+        <rect x="2" y="3" width="20" height="14" rx="2"/><path d="M8 21h8M12 17v4"/>
+      </svg>
+      <div>
+        <span class="db-status-label">Active Points</span>
+        <span class="db-status-val">{{ stats.active_points }}</span>
+      </div>
+    </div>
+    <div class="db-status-divider"></div>
+    <div class="db-status-item">
+      <svg width="20" height="20" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2">
+        <path d="M17 21v-2a4 4 0 0 0-4-4H5a4 4 0 0 0-4 4v2"/><circle cx="9" cy="7" r="4"/>
+      </svg>
+      <div>
+        <span class="db-status-label">Enrolled Users</span>
+        <span class="db-status-val">{{ stats.active_users }}</span>
+      </div>
+    </div>
+    <div class="db-status-divider"></div>
+    <div class="db-status-item">
+      <svg width="20" height="20" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2">
+        <polyline points="22 12 18 12 15 21 9 3 6 12 2 12"/>
+      </svg>
+      <div>
+        <span class="db-status-label">Total Events</span>
+        <span class="db-status-val">{{ stats.access_granted + stats.access_denied }}</span>
+      </div>
+    </div>
+    <div class="db-status-divider"></div>
+    <div class="db-status-item">
+      <svg width="20" height="20" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2">
+        <circle cx="12" cy="12" r="10"/><polyline points="12 6 12 12 16 14"/>
+      </svg>
+      <div>
+        <span class="db-status-label">System Status</span>
+        <span class="db-status-val db-status-online">&bull; Online</span>
+      </div>
+    </div>
   </div>
 </section>
+
+<!-- ===== Chart.js CDN ===== -->
+<script src="https://cdn.jsdelivr.net/npm/chart.js@4.4.3/dist/chart.umd.min.js"></script>
+
+<script>
+/* ─── Dashboard async data loader ─────────────────────────────────────────── */
+(function () {
+  'use strict';
+
+  // Skeleton pulse on stat numbers while loading
+  document.querySelectorAll('.db-stat-num').forEach(el => {
+    el.setAttribute('data-original', el.textContent);
+    el.style.opacity = '0.35';
+    el.style.animation = 'pulse-dim 1.2s ease-in-out infinite';
+  });
+
+  // Loading placeholder in activity feed
+  const feed = document.querySelector('.db-activity-feed');
+  if (feed) {
+    feed.innerHTML = `<div style="padding:20px 0;text-align:center;color:var(--dim);font-size:0.82rem;font-family:var(--mono);">
+      <div class="page-spinner" style="margin:0 auto 12px;width:28px;height:28px;border-width:2px;"></div>
+      Loading activity…
+    </div>`;
+  }
+
+  let _charts = {};
+
+  function _animateCounter(el, target, suffix) {
+    el.style.opacity = '1';
+    el.style.animation = '';
+    const isFloat   = target % 1 !== 0;
+    const duration  = 900;
+    const start     = performance.now();
+    function step(now) {
+      const p = Math.min((now - start) / duration, 1);
+      const eased = 1 - Math.pow(1 - p, 3);
+      el.textContent = (isFloat ? (eased * target).toFixed(1) : Math.floor(eased * target)) + (suffix || '');
+      if (p < 1) requestAnimationFrame(step);
+    }
+    requestAnimationFrame(step);
+  }
+
+  function _renderCharts(data) {
+    const gridColor = 'rgba(191,250,255,0.08)';
+    const tooltipBg = '#181a1b';
+    if (typeof Chart === 'undefined') return;
+    Chart.defaults.color       = '#a5afb4';
+    Chart.defaults.font.family = '"JetBrains Mono","Cascadia Mono",Consolas,monospace';
+    Chart.defaults.font.size   = 11;
+
+    const granted = data.stats.access_granted;
+    const denied  = data.stats.access_denied;
+
+    // 1. Donut
+    const donutEl = document.getElementById('donutChart');
+    if (donutEl) {
+      if (_charts.donut) _charts.donut.destroy();
+      _charts.donut = new Chart(donutEl.getContext('2d'), {
+        type: 'doughnut',
+        data: {
+          labels: ['Granted', 'Denied'],
+          datasets: [{
+            data: [Math.max(granted, 0.001), Math.max(denied, 0.001)],
+            backgroundColor: ['rgba(57,232,143,0.85)', 'rgba(255,107,107,0.85)'],
+            borderColor:     ['rgba(57,232,143,0.3)',  'rgba(255,107,107,0.3)'],
+            borderWidth: 2, hoverOffset: 8
+          }]
+        },
+        options: {
+          cutout: '72%',
+          animation: { duration: 1200, easing: 'easeInOutQuart' },
+          plugins: {
+            legend: { display: false },
+            tooltip: {
+              backgroundColor: tooltipBg, borderColor: 'rgba(191,250,255,0.2)',
+              borderWidth: 1, titleColor: '#baf7ff', bodyColor: '#a5afb4', padding: 12,
+              callbacks: { label: ctx => ` ${ctx.label}: ${ctx.parsed} events` }
+            }
+          }
+        }
+      });
+      // Update donut center text
+      const centre = donutEl.closest('.db-donut-wrap') && donutEl.closest('.db-donut-wrap').querySelector('.db-donut-pct');
+      if (centre) centre.textContent = data.stats.success_rate + '%';
+      // Update legend counts
+      const legendItems = donutEl.closest('.db-donut-card') && donutEl.closest('.db-donut-card').querySelectorAll('.db-legend-item strong');
+      if (legendItems && legendItems[0]) legendItems[0].textContent = granted;
+      if (legendItems && legendItems[1]) legendItems[1].textContent = denied;
+      if (legendItems && legendItems[2]) legendItems[2].textContent = data.stats.active_points;
+    }
+
+    // 2. Bar chart
+    const barEl = document.getElementById('barChart');
+    if (barEl && data.chart_7days) {
+      if (_charts.bar) _charts.bar.destroy();
+      _charts.bar = new Chart(barEl.getContext('2d'), {
+        type: 'bar',
+        data: {
+          labels: data.chart_7days.labels || [],
+          datasets: [
+            { label: 'Granted', data: data.chart_7days.granted || [], backgroundColor: 'rgba(57,232,143,0.75)', borderColor: 'rgba(57,232,143,1)', borderWidth: 1, borderRadius: 4, borderSkipped: false },
+            { label: 'Denied',  data: data.chart_7days.denied  || [], backgroundColor: 'rgba(255,107,107,0.75)', borderColor: 'rgba(255,107,107,1)', borderWidth: 1, borderRadius: 4, borderSkipped: false }
+          ]
+        },
+        options: {
+          responsive: true, maintainAspectRatio: false,
+          animation: { duration: 1000, easing: 'easeOutQuart' },
+          interaction: { mode: 'index', intersect: false },
+          scales: {
+            x: { grid: { color: gridColor }, ticks: { color: '#6f7c82' } },
+            y: { grid: { color: gridColor }, ticks: { color: '#6f7c82', precision: 0, stepSize: 1 }, beginAtZero: true }
+          },
+          plugins: { legend: { display: false }, tooltip: { backgroundColor: tooltipBg, borderColor: 'rgba(191,250,255,0.2)', borderWidth: 1, titleColor: '#baf7ff', bodyColor: '#a5afb4', padding: 12 } }
+        }
+      });
+    }
+
+    // 3. Horizontal bar
+    const hbarEl = document.getElementById('hbarChart');
+    if (hbarEl && data.chart_breakdown) {
+      if (_charts.hbar) _charts.hbar.destroy();
+      const palette = ['rgba(57,232,143,0.8)','rgba(255,107,107,0.8)','rgba(21,213,238,0.8)','rgba(255,193,7,0.8)','rgba(20,120,242,0.8)','rgba(165,175,180,0.6)','rgba(138,99,210,0.8)','rgba(249,115,22,0.8)'];
+      const bLabels = (data.chart_breakdown || []).map(d => d.label);
+      const bCounts = (data.chart_breakdown || []).map(d => d.count);
+      const bColors = bLabels.map((_, i) => palette[i % palette.length]);
+      _charts.hbar = new Chart(hbarEl.getContext('2d'), {
+        type: 'bar',
+        data: {
+          labels: bLabels,
+          datasets: [{ label: 'Events', data: bCounts, backgroundColor: bColors, borderColor: bColors.map(c => c.replace('0.8','1')), borderWidth: 1, borderRadius: 4, borderSkipped: false }]
+        },
+        options: {
+          indexAxis: 'y', responsive: true, maintainAspectRatio: false,
+          animation: { duration: 1100, easing: 'easeOutQuart', delay: ctx => ctx.dataIndex * 60 },
+          scales: {
+            x: { grid: { color: gridColor }, ticks: { color: '#6f7c82', precision: 0 }, beginAtZero: true },
+            y: { grid: { color: gridColor }, ticks: { color: '#a5afb4', font: { size: 10 } } }
+          },
+          plugins: { legend: { display: false }, tooltip: { backgroundColor: tooltipBg, borderColor: 'rgba(191,250,255,0.2)', borderWidth: 1, titleColor: '#baf7ff', bodyColor: '#a5afb4', padding: 12, callbacks: { label: ctx => ` ${ctx.parsed.x} events` } } }
+        }
+      });
+    }
+  }
+
+  function _renderActivity(logs) {
+    if (!feed) return;
+    if (!logs || !logs.length) {
+      feed.innerHTML = '<p class="db-empty">No activity yet.</p>';
+      return;
+    }
+    feed.innerHTML = logs.map(log => {
+      const dotClass = (log.status === 'Success' || log.status === 'Completed') ? 'db-dot-green' : (log.status === 'Failed' ? 'db-dot-red' : 'db-dot-cyan');
+      const ts = (log.timestamp || '').slice(0, 16);
+      const apPart = log.access_point ? `<span class="db-act-sep">&bull;</span> ${log.access_point}` : '';
+      return `<div class="db-activity-item">
+        <div class="db-act-dot ${dotClass}"></div>
+        <div class="db-act-body">
+          <div class="db-act-top">
+            <span class="db-act-event">${(log.event_type||'').replace('[Lambda] ','').trim()}</span>
+            <span class="db-act-time">${ts || '-'}</span>
+          </div>
+          <span class="db-act-user">${log.username || ''} ${apPart}</span>
+        </div>
+      </div>`;
+    }).join('');
+  }
+
+  function _updateStatusRow(stats) {
+    // Update system status row values
+    const statVals = document.querySelectorAll('.db-status-val:not(.db-status-online)');
+    const labels   = document.querySelectorAll('.db-status-label');
+    labels.forEach((lbl, i) => {
+      const val = statVals[i];
+      if (!val) return;
+      const txt = lbl.textContent.trim().toLowerCase();
+      if (txt.includes('active points')) val.textContent = stats.active_points;
+      else if (txt.includes('enrolled')) val.textContent = stats.active_users;
+      else if (txt.includes('total')) val.textContent = stats.access_granted + stats.access_denied;
+    });
+    // Update donut legend active_points
+    const apLegend = document.querySelectorAll('.db-legend-item strong')[2];
+    if (apLegend) apLegend.textContent = stats.active_points;
+  }
+
+  // ── Fetch stats asynchronously ──────────────────────────────────────────
+  fetch('/api/dashboard-stats', {
+    headers: { 'X-CSRFToken': document.querySelector('meta[name="csrf-token"]') && document.querySelector('meta[name="csrf-token"]').content || '' }
+  })
+  .then(r => r.ok ? r.json() : Promise.reject(r.status))
+  .then(data => {
+    if (!data.success) return;
+    const s = data.stats;
+
+    // Animate stat card counters
+    const cards = [
+      { selector: '.db-stat-granted .db-stat-num', val: s.access_granted, suffix: '' },
+      { selector: '.db-stat-denied  .db-stat-num', val: s.access_denied,  suffix: '' },
+      { selector: '.db-stat-users   .db-stat-num', val: s.active_users,   suffix: '' },
+      { selector: '.db-stat-rate    .db-stat-num', val: s.success_rate,   suffix: '%' },
+    ];
+    cards.forEach(({ selector, val, suffix }) => {
+      const el = document.querySelector(selector);
+      if (el) _animateCounter(el, val, suffix);
+    });
+
+    _renderCharts(data);
+    _renderActivity(data.recent_logs);
+    _updateStatusRow(s);
+  })
+  .catch(err => {
+    console.warn('Dashboard stats fetch failed:', err);
+    // Restore stat numbers so page isn't blank
+    document.querySelectorAll('.db-stat-num').forEach(el => {
+      el.style.opacity = '1';
+      el.style.animation = '';
+    });
+    if (feed) feed.innerHTML = '<p class="db-empty">Could not load activity. Refresh to retry.</p>';
+  });
+
+})();
+</script>
+
+<!-- old static chart block removed; data is now loaded async by the loader above -->
+
+<!-- Dashboard-specific styles -->
+<style>
+/* Stat cards row */
+.db-stats-row {
+  display: grid;
+  grid-template-columns: repeat(4, 1fr);
+  gap: 16px;
+  margin-bottom: 20px;
+}
+
+.db-stat-card {
+  position: relative;
+  display: flex;
+  align-items: center;
+  gap: 16px;
+  padding: 20px;
+  border-radius: 14px;
+  border: 1px solid var(--line);
+  background: var(--panel);
+  overflow: hidden;
+  transition: transform 200ms ease, border-color 200ms ease;
+}
+.db-stat-card:hover { transform: translateY(-3px); border-color: var(--line-strong); }
+
+.db-stat-icon {
+  flex-shrink: 0;
+  width: 46px;
+  height: 46px;
+  border-radius: 10px;
+  display: flex;
+  align-items: center;
+  justify-content: center;
+}
+.db-stat-granted .db-stat-icon { background: rgba(57,232,143,0.12); color: #39e88f; }
+.db-stat-denied  .db-stat-icon { background: rgba(255,107,107,0.12); color: #ff6b6b; }
+.db-stat-users   .db-stat-icon { background: rgba(21,213,238,0.12);  color: var(--cyan); }
+.db-stat-rate    .db-stat-icon { background: rgba(20,120,242,0.12);  color: #7ab8ff; }
+
+.db-stat-body { flex: 1; min-width: 0; }
+
+.db-stat-label {
+  display: block;
+  font-family: var(--mono);
+  font-size: 0.68rem;
+  font-weight: 700;
+  text-transform: uppercase;
+  letter-spacing: 0.1em;
+  color: var(--muted);
+  margin-bottom: 4px;
+}
+.db-stat-num {
+  display: block;
+  font-size: 2rem;
+  font-weight: 800;
+  line-height: 1;
+  letter-spacing: -0.02em;
+  color: var(--text);
+  margin-bottom: 4px;
+}
+.db-stat-granted .db-stat-num { color: #39e88f; }
+.db-stat-denied  .db-stat-num { color: #ff6b6b; }
+.db-stat-rate    .db-stat-num { color: #7ab8ff; }
+
+.db-stat-sub {
+  font-size: 0.73rem;
+  color: var(--dim);
+}
+.db-stat-glow {
+  position: absolute;
+  right: -30px;
+  bottom: -30px;
+  width: 100px;
+  height: 100px;
+  border-radius: 50%;
+  opacity: 0.12;
+  pointer-events: none;
+}
+.db-glow-green { background: #39e88f; }
+.db-glow-red   { background: #ff6b6b; }
+.db-glow-blue  { background: #7ab8ff; }
+.db-glow-cyan  { background: var(--cyan); }
+
+/* Charts rows */
+.db-charts-row {
+  display: grid;
+  grid-template-columns: 300px 1fr;
+  gap: 16px;
+  margin-bottom: 20px;
+}
+.db-charts-row-2 {
+  grid-template-columns: 1fr 360px;
+}
+
+.db-chart-card {
+  background: var(--panel);
+  border: 1px solid var(--line);
+  border-radius: 14px;
+  padding: 22px 24px;
+  display: flex;
+  flex-direction: column;
+  gap: 16px;
+}
+
+.db-chart-header {
+  display: flex;
+  align-items: flex-start;
+  justify-content: space-between;
+  gap: 12px;
+}
+.db-chart-title {
+  margin: 0 0 3px;
+  font-size: 0.95rem;
+  font-weight: 700;
+  color: var(--cyan-soft);
+}
+.db-chart-sub {
+  margin: 0;
+  font-size: 0.76rem;
+  color: var(--dim);
+  font-family: var(--mono);
+}
+.db-chart-badge {
+  flex-shrink: 0;
+  padding: 3px 8px;
+  border-radius: 999px;
+  background: rgba(57,232,143,0.12);
+  color: #39e88f;
+  font-family: var(--mono);
+  font-size: 0.65rem;
+  font-weight: 700;
+  letter-spacing: 0.08em;
+  border: 1px solid rgba(57,232,143,0.25);
+  animation: pulseBadge 2s ease-in-out infinite;
+}
+@keyframes pulseBadge {
+  0%,100% { opacity: 1; }
+  50%      { opacity: 0.5; }
+}
+
+/* Donut */
+.db-donut-wrap {
+  position: relative;
+  width: 200px;
+  height: 200px;
+  margin: 0 auto;
+  flex-shrink: 0;
+}
+.db-donut-centre {
+  position: absolute;
+  inset: 0;
+  display: flex;
+  flex-direction: column;
+  align-items: center;
+  justify-content: center;
+  pointer-events: none;
+}
+.db-donut-pct {
+  font-size: 1.7rem;
+  font-weight: 800;
+  color: var(--text);
+  line-height: 1;
+}
+.db-donut-lbl {
+  font-size: 0.7rem;
+  font-family: var(--mono);
+  color: var(--muted);
+  text-transform: uppercase;
+  letter-spacing: 0.1em;
+  margin-top: 4px;
+}
+.db-donut-legend {
+  display: flex;
+  flex-direction: column;
+  gap: 10px;
+  font-size: 0.83rem;
+  color: var(--muted);
+}
+.db-legend-item {
+  display: flex;
+  align-items: center;
+  gap: 10px;
+}
+.db-legend-dot {
+  width: 10px;
+  height: 10px;
+  border-radius: 3px;
+  flex-shrink: 0;
+}
+.db-legend-item strong { color: var(--text); }
+
+/* Bar legend */
+.db-bar-legend {
+  display: flex;
+  gap: 16px;
+  font-size: 0.75rem;
+  color: var(--muted);
+  font-family: var(--mono);
+  flex-shrink: 0;
+}
+.db-bar-legend i {
+  display: inline-block;
+  width: 10px; height: 10px;
+  border-radius: 2px;
+  margin-right: 4px;
+  vertical-align: middle;
+}
+.db-bar-wrap {
+  flex: 1;
+  min-height: 210px;
+  position: relative;
+}
+
+/* Horizontal bar */
+.db-hbar-wrap {
+  flex: 1;
+  min-height: 260px;
+  position: relative;
+}
+
+/* Activity Feed */
+.db-activity-feed {
+  display: flex;
+  flex-direction: column;
+  gap: 0;
+  flex: 1;
+  overflow-y: auto;
+  max-height: 320px;
+}
+.db-activity-item {
+  display: flex;
+  align-items: flex-start;
+  gap: 12px;
+  padding: 10px 0;
+  border-bottom: 1px solid rgba(255,255,255,0.05);
+}
+.db-activity-item:last-child { border-bottom: none; }
+
+.db-act-dot {
+  flex-shrink: 0;
+  width: 8px;
+  height: 8px;
+  border-radius: 50%;
+  margin-top: 5px;
+}
+.db-dot-green { background: #39e88f; box-shadow: 0 0 6px rgba(57,232,143,0.6); }
+.db-dot-red   { background: #ff6b6b; box-shadow: 0 0 6px rgba(255,107,107,0.6); }
+.db-dot-cyan  { background: var(--cyan); box-shadow: 0 0 6px rgba(21,213,238,0.6); }
+
+.db-act-body { flex: 1; min-width: 0; }
+.db-act-top {
+  display: flex;
+  justify-content: space-between;
+  gap: 8px;
+  margin-bottom: 2px;
+}
+.db-act-event {
+  font-size: 0.82rem;
+  font-weight: 600;
+  color: var(--text);
+  white-space: nowrap;
+  overflow: hidden;
+  text-overflow: ellipsis;
+}
+.db-act-time {
+  font-family: var(--mono);
+  font-size: 0.68rem;
+  color: var(--dim);
+  flex-shrink: 0;
+}
+.db-act-user {
+  font-size: 0.75rem;
+  color: var(--muted);
+  font-family: var(--mono);
+}
+.db-act-sep { margin: 0 4px; color: var(--dim); }
+.db-empty { color: var(--dim); font-size: 0.85rem; padding: 16px 0; font-style: italic; }
+.db-view-all {
+  font-size: 0.75rem;
+  font-family: var(--mono);
+  color: var(--cyan);
+  flex-shrink: 0;
+  transition: color 150ms;
+}
+.db-view-all:hover { color: var(--cyan-soft); }
+
+/* Status bar */
+.db-points-card { flex-direction: column; }
+.db-status-row {
+  display: flex;
+  align-items: center;
+  gap: 0;
+  flex-wrap: wrap;
+}
+.db-status-item {
+  display: flex;
+  align-items: center;
+  gap: 12px;
+  flex: 1;
+  min-width: 160px;
+  color: var(--muted);
+  padding: 8px 16px;
+}
+.db-status-item svg { color: var(--cyan); flex-shrink: 0; }
+.db-status-label {
+  display: block;
+  font-family: var(--mono);
+  font-size: 0.68rem;
+  text-transform: uppercase;
+  letter-spacing: 0.08em;
+  color: var(--dim);
+  margin-bottom: 2px;
+}
+.db-status-val {
+  display: block;
+  font-size: 1.1rem;
+  font-weight: 700;
+  color: var(--text);
+}
+.db-status-online {
+  color: #39e88f !important;
+  font-size: 0.85rem !important;
+}
+.db-status-divider {
+  width: 1px;
+  height: 40px;
+  background: var(--line);
+  flex-shrink: 0;
+}
+
+/* Responsive */
+@media (max-width: 1200px) {
+  .db-stats-row { grid-template-columns: repeat(2, 1fr); }
+  .db-charts-row { grid-template-columns: 1fr; }
+  .db-charts-row-2 { grid-template-columns: 1fr; }
+  .db-donut-wrap { width: 180px; height: 180px; }
+}
+@media (max-width: 768px) {
+  .db-stats-row { grid-template-columns: 1fr 1fr; gap: 12px; }
+  .db-stat-num { font-size: 1.5rem; }
+  .db-status-row { flex-direction: column; align-items: flex-start; }
+  .db-status-divider { display: none; }
+}
+@media (max-width: 480px) {
+  .db-stats-row { grid-template-columns: 1fr; }
+}
+</style>
 {% endblock %}

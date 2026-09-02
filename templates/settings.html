@@ -3,185 +3,1617 @@
 {% block title %}FaceAuth | Settings{% endblock %}
 
 {% block dashboard_title %}Settings{% endblock %}
-{% block dashboard_subtitle %}Configure system preferences and options{% endblock %}
+{% block dashboard_subtitle %}System configuration &amp; administration{% endblock %}
 {% block dashboard_notifications_count %}0{% endblock %}
 
 {% block dashboard_content %}
-<div class="settings-grid">
-  <!-- System Settings -->
-  <section class="settings-section">
-    <h2>System Settings</h2>
-    
-    <div class="setting-item">
-      <div class="setting-header">
-        <label>System Mode</label>
-        <p class="setting-description">Choose between high security and standard modes</p>
+
+<div class="settings-page">
+  <!-- TAB NAV -->
+  <nav class="settings-tabs-nav">
+    <button class="stab active" onclick="switchTab('thresholds', this)">
+      <svg width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2">
+        <circle cx="12" cy="12" r="3" />
+        <path
+          d="M12 1v2m0 18v2M4.22 4.22l1.42 1.42m12.72 12.72 1.42 1.42M1 12h2m18 0h2M4.22 19.78l1.42-1.42M18.36 5.64l1.42-1.42" />
+      </svg>
+      System Thresholds
+    </button>
+    <button class="stab" onclick="switchTab('account', this)">
+      <svg width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2">
+        <path d="M20 21v-2a4 4 0 0 0-4-4H8a4 4 0 0 0-4 4v2" />
+        <circle cx="12" cy="7" r="4" />
+      </svg>
+      Admin Account
+    </button>
+    <button class="stab" onclick="switchTab('status', this)">
+      <svg width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2">
+        <polyline points="22 12 18 12 15 21 9 3 6 12 2 12" />
+      </svg>
+      System Status
+    </button>
+    <button class="stab" onclick="switchTab('logs', this)">
+      <svg width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2">
+        <path d="M14 2H6a2 2 0 0 0-2 2v16a2 2 0 0 0 2 2h12a2 2 0 0 0 2-2V8z" />
+        <polyline points="14 2 14 8 20 8" />
+        <line x1="16" y1="13" x2="8" y2="13" />
+        <line x1="16" y1="17" x2="8" y2="17" />
+      </svg>
+      Audit Logs
+    </button>
+  </nav>
+
+  <!-- ══ TAB 1: THRESHOLDS ══ -->
+  <div class="stab-panel active" id="tab-thresholds">
+    <div class="settings-section-header">
+      <div>
+        <h2>System Thresholds</h2>
+        <p>Applied live to all authentication checks &mdash; no server restart required.</p>
       </div>
-      <select class="setting-select">
-        <option>High Security Mode</option>
-        <option>Standard Mode</option>
-        <option>Maintenance Mode</option>
-      </select>
+      <button class="s-save-btn" id="saveThresholdsBtn" onclick="saveThresholds()">
+        <svg width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2">
+          <path d="M19 21H5a2 2 0 0 1-2-2V5a2 2 0 0 1 2-2h11l5 5v11a2 2 0 0 1-2 2z" />
+          <polyline points="17 21 17 13 7 13 7 21" />
+          <polyline points="7 3 7 8 15 8" />
+        </svg>
+        Save Thresholds
+      </button>
     </div>
 
-    <div class="setting-item">
-      <div class="setting-header">
-        <label>Recognition Sensitivity</label>
-        <p class="setting-description">Adjust facial recognition accuracy threshold</p>
+    <div class="settings-cards-grid">
+
+      <!-- Face Tolerance -->
+      <div class="s-card">
+        <div class="s-card-icon" style="background:linear-gradient(135deg,#8b5cf6,#6d28d9)">
+          <svg width="22" height="22" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2">
+            <path d="M20 21v-2a4 4 0 0 0-4-4H8a4 4 0 0 0-4 4v2" />
+            <circle cx="12" cy="7" r="4" />
+          </svg>
+        </div>
+        <label class="s-label">Face Recognition Tolerance</label>
+        <p class="s-desc">How strict face matching is. Lower = stricter (fewer false positives). Range: 0.30 &ndash;
+          0.90</p>
+        <div class="s-slider-row">
+          <span class="s-slider-badge strict">Strict</span>
+          <div class="s-slider-wrap">
+            <input type="range" id="faceTolerance" min="30" max="90" step="1" value="{{ (face_tolerance * 100)|int }}"
+              oninput="updateSlider(this, 'faceToleranceVal', function(v){ return (v/100).toFixed(2); })">
+          </div>
+          <span class="s-slider-badge lenient">Lenient</span>
+        </div>
+        <div class="s-slider-value-row">
+          <span>Current: <strong id="faceToleranceVal">{{ face_tolerance }}</strong></span>
+          <span class="s-hint">Recommended: 0.50 &ndash; 0.60</span>
+        </div>
       </div>
-      <input type="range" class="setting-slider" min="0" max="100" value="85">
-      <span class="slider-value">85%</span>
-    </div>
 
-    <div class="setting-item">
-      <div class="setting-header">
-        <label>Multi-Factor Authentication</label>
-        <p class="setting-description">Require additional verification for access</p>
+      <!-- BT RSSI -->
+      <div class="s-card">
+        <div class="s-card-icon" style="background:linear-gradient(135deg,#06b6d4,#0891b2)">
+          <svg width="22" height="22" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2">
+            <path d="M1 6l5 5-5 5m8-10l5 5-5 5m8-10l5 5-5 5" />
+          </svg>
+        </div>
+        <label class="s-label">Bluetooth RSSI Threshold (dBm)</label>
+        <p class="s-desc">Minimum signal strength for proximity 2FA. Less negative = must be closer. Range: &minus;100
+          to &minus;30</p>
+        <div class="s-slider-row">
+          <span class="s-slider-badge strict">Far</span>
+          <div class="s-slider-wrap">
+            <input type="range" id="btRssi" min="-100" max="-30" step="1" value="{{ bt_rssi }}"
+              oninput="updateSlider(this, 'btRssiVal', function(v){ return v + ' dBm'; })">
+          </div>
+          <span class="s-slider-badge lenient">Near</span>
+        </div>
+        <div class="s-slider-value-row">
+          <span>Current: <strong id="btRssiVal">{{ bt_rssi }} dBm</strong></span>
+          <span class="s-hint">Recommended: &minus;75 to &minus;55 dBm</span>
+        </div>
       </div>
-      <label class="setting-toggle">
-        <input type="checkbox" checked>
-        <span class="toggle-switch"></span>
-        <span>Enabled</span>
-      </label>
-    </div>
 
-    <div class="setting-item">
-      <div class="setting-header">
-        <label>Enable Audit Logging</label>
-        <p class="setting-description">Record all system activities for compliance</p>
+      <!-- BT Scan Duration -->
+      <div class="s-card" style="grid-column:span 2">
+        <div class="s-card-icon" style="background:linear-gradient(135deg,#f59e0b,#d97706)">
+          <svg width="22" height="22" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2">
+            <circle cx="12" cy="12" r="10" />
+            <polyline points="12 6 12 12 16 14" />
+          </svg>
+        </div>
+        <label class="s-label">Bluetooth Scan Duration</label>
+        <p class="s-desc">How long the BLE scanner listens per proximity check. Longer is more reliable but slower.</p>
+        <div class="s-number-row">
+          <button class="s-num-btn" onclick="nudgeScan(-0.5)">&minus;</button>
+          <div class="s-number-display">
+            <input type="number" id="btScan" min="1" max="30" step="0.5" value="{{ bt_scan }}">
+            <span class="s-num-unit">seconds</span>
+          </div>
+          <button class="s-num-btn" onclick="nudgeScan(0.5)">+</button>
+        </div>
+        <p class="s-hint" style="margin-top:8px">Recommended: 4 &ndash; 10 seconds</p>
       </div>
-      <label class="setting-toggle">
-        <input type="checkbox" checked>
-        <span class="toggle-switch"></span>
-        <span>Enabled</span>
-      </label>
+
     </div>
-  </section>
+    <div class="s-toast" id="thresholdsToast"></div>
+  </div>
 
-  <!-- Security Settings -->
-  <section class="settings-section">
-    <h2>Security Settings</h2>
-
-    <div class="setting-item">
-      <div class="setting-header">
-        <label>Session Timeout</label>
-        <p class="setting-description">Automatically logout after inactivity</p>
-      </div>
-      <select class="setting-select">
-        <option>15 minutes</option>
-        <option>30 minutes</option>
-        <option>1 hour</option>
-        <option>2 hours</option>
-      </select>
-    </div>
-
-    <div class="setting-item">
-      <div class="setting-header">
-        <label>Password Policy</label>
-        <p class="setting-description">Set minimum password requirements</p>
-      </div>
-      <div class="setting-checkbox-group">
-        <label class="setting-checkbox">
-          <input type="checkbox" checked>
-          <span>Minimum 12 characters</span>
-        </label>
-        <label class="setting-checkbox">
-          <input type="checkbox" checked>
-          <span>Require special characters</span>
-        </label>
-        <label class="setting-checkbox">
-          <input type="checkbox">
-          <span>Require numbers and letters</span>
-        </label>
+  <!-- ══ TAB 2: ADMIN ACCOUNT ══ -->
+  <div class="stab-panel" id="tab-account">
+    <div class="settings-section-header">
+      <div>
+        <h2>Admin Account</h2>
+        <p>Manage your profile information and login credentials.</p>
       </div>
     </div>
+    <div class="account-grid">
 
-    <div class="setting-item">
-      <div class="setting-header">
-        <label>IP Whitelist</label>
-        <p class="setting-description">Restrict access to specific IP addresses</p>
+      <!-- Profile Card -->
+      <div class="s-card account-card">
+        <div class="account-card-header">
+          <div class="account-avatar">
+            {% if admin.get('photo_path') %}
+            <img src="/uploads/{{ admin.photo_path }}" alt="Avatar" class="account-avatar-img">
+            {% else %}
+            <div class="account-avatar-placeholder">{{ (admin.get('full_name', operator_id) or operator_id)[0]|upper }}
+            </div>
+            {% endif %}
+          </div>
+          <div class="account-meta">
+            <h3>{{ admin.get('full_name', operator_id) }}</h3>
+            <span class="account-role-badge">{{ admin.get('role', 'Administrator') }}</span>
+            <p class="account-username">@{{ operator_id }}</p>
+          </div>
+        </div>
+        <form id="profileForm" onsubmit="saveProfile(event)">
+          <div class="s-form-group">
+            <label class="s-label">Full Name <span class="s-required">*</span></label>
+            <input type="text" id="profileFullName" class="s-input" value="{{ admin.get('full_name', '') }}"
+              placeholder="Enter full name" required>
+          </div>
+          <div class="s-form-group">
+            <label class="s-label">Email Address</label>
+            <input type="email" id="profileEmail" class="s-input" value="{{ admin.get('email', '') }}"
+              placeholder="admin@example.com">
+          </div>
+          <div class="s-form-group">
+            <label class="s-label">Phone Number</label>
+            <input type="text" id="profilePhone" class="s-input" value="{{ admin.get('phone', '') }}"
+              placeholder="+60 11-1234 5678">
+          </div>
+          <div class="s-form-actions">
+            <button type="submit" class="s-save-btn">
+              <svg width="15" height="15" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2">
+                <path d="M19 21H5a2 2 0 0 1-2-2V5a2 2 0 0 1 2-2h11l5 5v11a2 2 0 0 1-2 2z" />
+                <polyline points="17 21 17 13 7 13 7 21" />
+              </svg>
+              Save Profile
+            </button>
+          </div>
+        </form>
+        <div class="s-toast" id="profileToast"></div>
       </div>
-      <label class="setting-toggle">
-        <input type="checkbox">
-        <span class="toggle-switch"></span>
-        <span>Enabled</span>
-      </label>
-    </div>
-  </section>
 
-  <!-- Notification Settings -->
-  <section class="settings-section">
-    <h2>Notification Settings</h2>
-
-    <div class="setting-item">
-      <div class="setting-header">
-        <label>Email Notifications</label>
-        <p class="setting-description">Receive alerts via email</p>
+      <!-- Password Card -->
+      <div class="s-card account-card">
+        <div class="s-card-header-inner">
+          <div class="s-card-icon" style="background:linear-gradient(135deg,#ef4444,#dc2626)">
+            <svg width="20" height="20" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2">
+              <rect x="3" y="11" width="18" height="11" rx="2" ry="2" />
+              <path d="M7 11V7a5 5 0 0 1 10 0v4" />
+            </svg>
+          </div>
+          <h3 class="s-card-title">Change Password</h3>
+        </div>
+        <form id="passwordForm" onsubmit="changePassword(event)">
+          <div class="s-form-group">
+            <label class="s-label">Current Password</label>
+            <div class="s-pw-wrap">
+              <input type="password" id="currentPw" class="s-input" placeholder="Enter current password" required>
+              <button type="button" class="s-pw-toggle" onclick="togglePw('currentPw',this)">
+                <svg width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2">
+                  <path d="M1 12s4-8 11-8 11 8 11 8-4 8-11 8-11-8-11-8z" />
+                  <circle cx="12" cy="12" r="3" />
+                </svg>
+              </button>
+            </div>
+          </div>
+          <div class="s-form-group">
+            <label class="s-label">New Password</label>
+            <div class="s-pw-wrap">
+              <input type="password" id="newPw" class="s-input" placeholder="Min. 8 characters" required
+                oninput="checkPwStrength(this.value)">
+              <button type="button" class="s-pw-toggle" onclick="togglePw('newPw',this)">
+                <svg width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2">
+                  <path d="M1 12s4-8 11-8 11 8 11 8-4 8-11 8-11-8-11-8z" />
+                  <circle cx="12" cy="12" r="3" />
+                </svg>
+              </button>
+            </div>
+            <div class="pw-strength-bar">
+              <div class="pw-strength-fill" id="pwStrengthFill"></div>
+            </div>
+            <span class="pw-strength-label" id="pwStrengthLabel"></span>
+          </div>
+          <div class="s-form-group">
+            <label class="s-label">Confirm New Password</label>
+            <div class="s-pw-wrap">
+              <input type="password" id="confirmPw" class="s-input" placeholder="Re-enter new password" required>
+              <button type="button" class="s-pw-toggle" onclick="togglePw('confirmPw',this)">
+                <svg width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2">
+                  <path d="M1 12s4-8 11-8 11 8 11 8-4 8-11 8-11-8-11-8z" />
+                  <circle cx="12" cy="12" r="3" />
+                </svg>
+              </button>
+            </div>
+          </div>
+          <div class="s-form-actions">
+            <button type="submit" class="s-save-btn s-danger-btn">
+              <svg width="15" height="15" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2">
+                <rect x="3" y="11" width="18" height="11" rx="2" />
+                <path d="M7 11V7a5 5 0 0 1 10 0v4" />
+              </svg>
+              Update Password
+            </button>
+          </div>
+        </form>
+        <div class="s-toast" id="passwordToast"></div>
       </div>
-      <label class="setting-toggle">
-        <input type="checkbox" checked>
-        <span class="toggle-switch"></span>
-        <span>Enabled</span>
-      </label>
-    </div>
 
-    <div class="setting-item">
-      <div class="setting-header">
-        <label>Failed Access Alerts</label>
-        <p class="setting-description">Alert on repeated failed access attempts</p>
+    </div>
+  </div>
+
+  <!-- ══ TAB 3: SYSTEM STATUS ══ -->
+  <div class="stab-panel" id="tab-status">
+    <div class="settings-section-header">
+      <div>
+        <h2>System Status</h2>
+        <p>Live runtime information about this FaceAuth deployment.</p>
       </div>
-      <label class="setting-toggle">
-        <input type="checkbox" checked>
-        <span class="toggle-switch"></span>
-        <span>Enabled</span>
-      </label>
+      <span class="s-live-badge"><span class="s-live-dot"></span> Live</span>
     </div>
+    <div class="status-cards-grid">
 
-    <div class="setting-item">
-      <div class="setting-header">
-        <label>System Alerts</label>
-        <p class="setting-description">Receive system maintenance and update notifications</p>
+      <div class="status-group-card">
+        <h4 class="status-group-title">
+          <svg width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2">
+            <rect x="2" y="3" width="20" height="14" rx="2" />
+            <line x1="8" y1="21" x2="16" y2="21" />
+            <line x1="12" y1="17" x2="12" y2="21" />
+          </svg>
+          Runtime
+        </h4>
+        <div class="status-rows">
+          <div class="status-row"><span class="status-key">Python</span><span class="status-val">{{
+              system_info.python_version }}</span></div>
+          <div class="status-row"><span class="status-key">Platform</span><span class="status-val">{{
+              system_info.platform }}</span></div>
+          <div class="status-row">
+            <span class="status-key">Flask Env</span>
+            <span class="status-val">
+              <span
+                class="status-badge {% if system_info.flask_env == 'production' %}badge-green{% else %}badge-yellow{% endif %}">{{
+                system_info.flask_env }}</span>
+            </span>
+          </div>
+          <div class="status-row">
+            <span class="status-key">Face Recognition Lib</span>
+            <span class="status-val">
+              <span
+                class="status-badge {% if system_info.face_lib == 'Available' %}badge-green{% else %}badge-red{% endif %}">{{
+                system_info.face_lib }}</span>
+            </span>
+          </div>
+          <div class="status-row">
+            <span class="status-key">Bleak BLE Library</span>
+            <span class="status-val">
+              <span
+                class="status-badge {% if system_info.bleak_available %}badge-green{% else %}badge-red{% endif %}">{% if
+                system_info.bleak_available %}Available{% else %}Not installed{% endif %}</span>
+            </span>
+          </div>
+        </div>
       </div>
-      <label class="setting-toggle">
-        <input type="checkbox" checked>
-        <span class="toggle-switch"></span>
-        <span>Enabled</span>
-      </label>
-    </div>
-  </section>
 
-  <!-- Backup & Maintenance -->
-  <section class="settings-section">
-    <h2>Backup & Maintenance</h2>
-
-    <div class="setting-item">
-      <div class="setting-header">
-        <label>Automatic Backups</label>
-        <p class="setting-description">Schedule regular database backups</p>
+      <div class="status-group-card">
+        <h4 class="status-group-title">
+          <svg width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2">
+            <path d="M18 10h-1.26A8 8 0 1 0 9 20h9a5 5 0 0 0 0-10z" />
+          </svg>
+          AWS Cloud
+        </h4>
+        <div class="status-rows">
+          <div class="status-row"><span class="status-key">Region</span><span class="status-val">{{
+              system_info.aws_region }}</span></div>
+          <div class="status-row"><span class="status-key">S3 Bucket</span><span class="status-val mono">{{
+              system_info.s3_bucket }}</span></div>
+          <div class="status-row"><span class="status-key">Users Table</span><span class="status-val mono">{{
+              system_info.dynamo_users }}</span></div>
+          <div class="status-row"><span class="status-key">Logs Table</span><span class="status-val mono">{{
+              system_info.dynamo_logs }}</span></div>
+          <div class="status-row"><span class="status-key">Access Points</span><span class="status-val mono">{{
+              system_info.dynamo_points }}</span></div>
+          <div class="status-row"><span class="status-key">IoT Endpoint</span><span class="status-val mono"
+              style="font-size:.72rem;word-break:break-all">{{ system_info.iot_endpoint }}</span></div>
+        </div>
       </div>
-      <select class="setting-select">
-        <option>Daily at 2:00 AM</option>
-        <option>Every 6 hours</option>
-        <option>Weekly on Sunday</option>
-        <option>Monthly on 1st</option>
-      </select>
-    </div>
 
-    <div class="setting-actions">
-      <button class="btn btn-primary">Save Changes</button>
-      <button class="btn btn-outline">Reset to Default</button>
-      <button class="btn btn-outline">Export Settings</button>
+      <div class="status-group-card">
+        <h4 class="status-group-title">
+          <svg width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2">
+            <circle cx="12" cy="12" r="3" />
+            <path
+              d="M12 1v2m0 18v2M4.22 4.22l1.42 1.42m12.72 12.72 1.42 1.42M1 12h2m18 0h2M4.22 19.78l1.42-1.42M18.36 5.64l1.42-1.42" />
+          </svg>
+          Active Thresholds
+        </h4>
+        <div class="status-rows">
+          <div class="status-row"><span class="status-key">Face Tolerance</span><span class="status-val"
+              id="liveStatFaceTol">{{ face_tolerance }}</span></div>
+          <div class="status-row"><span class="status-key">BT RSSI</span><span class="status-val" id="liveStatBtRssi">{{
+              bt_rssi }} dBm</span></div>
+          <div class="status-row"><span class="status-key">BT Scan Duration</span><span class="status-val"
+              id="liveStatBtScan">{{ bt_scan }}s</span></div>
+        </div>
+      </div>
+
     </div>
-  </section>
+  </div>
+
+  <!-- ══ TAB 4: AUDIT LOGS ══ -->
+  <div class="stab-panel" id="tab-logs">
+    <div class="settings-section-header">
+      <div>
+        <h2>Audit Log Export</h2>
+        <p>View recent system events and download a full CSV.</p>
+      </div>
+      <a href="/settings/export-logs" class="s-save-btn s-export-btn">
+        <svg width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2">
+          <path d="M21 15v4a2 2 0 0 1-2 2H5a2 2 0 0 1-2-2v-4" />
+          <polyline points="7 10 12 15 17 10" />
+          <line x1="12" y1="15" x2="12" y2="3" />
+        </svg>
+        Export CSV
+      </a>
+    </div>
+    <div class="logs-preview-card">
+      <div class="logs-preview-header">
+        <span class="logs-preview-title">Recent 50 Events</span>
+        <span class="logs-count-badge" id="logsCountBadge">Loading&hellip;</span>
+      </div>
+      <div class="logs-table-wrap" id="logsTableWrap">
+        <div class="s-loading-spinner">
+          <div class="spinner-ring"></div><span>Loading audit log&hellip;</span>
+        </div>
+      </div>
+    </div>
+  </div>
+
 </div>
 
+<style>
+  .settings-page {
+    max-width: 1100px;
+    margin: 0 auto
+  }
+
+  .settings-tabs-nav {
+    display: flex;
+    gap: 4px;
+    background: rgba(255, 255, 255, .04);
+    border: 1px solid rgba(255, 255, 255, .08);
+    border-radius: 14px;
+    padding: 6px;
+    margin-bottom: 28px
+  }
+
+  .stab {
+    display: flex;
+    align-items: center;
+    gap: 8px;
+    flex: 1;
+    justify-content: center;
+    padding: 10px 18px;
+    border: none;
+    background: transparent;
+    color: rgba(255, 255, 255, .5);
+    border-radius: 10px;
+    font-size: .85rem;
+    font-weight: 500;
+    cursor: pointer;
+    transition: all .22s;
+    white-space: nowrap
+  }
+
+  .stab:hover {
+    background: rgba(255, 255, 255, .07);
+    color: rgba(255, 255, 255, .85)
+  }
+
+  .stab.active {
+    background: linear-gradient(135deg, rgba(99, 102, 241, .3), rgba(139, 92, 246, .2));
+    color: #a78bfa;
+    border: 1px solid rgba(139, 92, 246, .35);
+    box-shadow: 0 2px 12px rgba(99, 102, 241, .2)
+  }
+
+  .stab-panel {
+    display: none
+  }
+
+  .stab-panel.active {
+    display: block;
+    animation: fadeSlideIn .3s ease
+  }
+
+  @keyframes fadeSlideIn {
+    from {
+      opacity: 0;
+      transform: translateY(8px)
+    }
+
+    to {
+      opacity: 1;
+      transform: translateY(0)
+    }
+  }
+
+  .settings-section-header {
+    display: flex;
+    align-items: flex-start;
+    justify-content: space-between;
+    margin-bottom: 24px;
+    gap: 16px
+  }
+
+  .settings-section-header h2 {
+    font-size: 1.35rem;
+    font-weight: 700;
+    color: #e2e8f0;
+    margin: 0 0 4px
+  }
+
+  .settings-section-header p {
+    font-size: .85rem;
+    color: rgba(255, 255, 255, .45);
+    margin: 0
+  }
+
+  .s-save-btn {
+    display: flex;
+    align-items: center;
+    gap: 7px;
+    padding: 10px 20px;
+    background: linear-gradient(135deg, #6366f1, #8b5cf6);
+    color: #fff;
+    border: none;
+    border-radius: 10px;
+    font-size: .85rem;
+    font-weight: 600;
+    cursor: pointer;
+    text-decoration: none;
+    transition: all .2s;
+    white-space: nowrap;
+    flex-shrink: 0
+  }
+
+  .s-save-btn:hover {
+    background: linear-gradient(135deg, #4f46e5, #7c3aed);
+    transform: translateY(-1px);
+    box-shadow: 0 6px 20px rgba(99, 102, 241, .4)
+  }
+
+  .s-danger-btn {
+    background: linear-gradient(135deg, #ef4444, #dc2626) !important
+  }
+
+  .s-danger-btn:hover {
+    background: linear-gradient(135deg, #dc2626, #b91c1c) !important;
+    box-shadow: 0 6px 20px rgba(239, 68, 68, .4) !important
+  }
+
+  .s-export-btn {
+    background: linear-gradient(135deg, #10b981, #059669) !important
+  }
+
+  .s-export-btn:hover {
+    background: linear-gradient(135deg, #059669, #047857) !important;
+    box-shadow: 0 6px 20px rgba(16, 185, 129, .4) !important
+  }
+
+  .settings-cards-grid {
+    display: grid;
+    grid-template-columns: 1fr 1fr;
+    gap: 20px
+  }
+
+  .s-card {
+    background: rgba(255, 255, 255, .04);
+    border: 1px solid rgba(255, 255, 255, .09);
+    border-radius: 16px;
+    padding: 24px;
+    transition: border-color .2s
+  }
+
+  .s-card:hover {
+    border-color: rgba(139, 92, 246, .3)
+  }
+
+  .s-card-icon {
+    width: 46px;
+    height: 46px;
+    border-radius: 12px;
+    display: flex;
+    align-items: center;
+    justify-content: center;
+    color: #fff;
+    margin-bottom: 18px
+  }
+
+  .s-label {
+    display: block;
+    font-size: .9rem;
+    font-weight: 600;
+    color: #e2e8f0;
+    margin-bottom: 4px
+  }
+
+  .s-required {
+    color: #f87171;
+    margin-left: 3px
+  }
+
+  .s-desc {
+    font-size: .8rem;
+    color: rgba(255, 255, 255, .45);
+    margin: 0 0 16px;
+    line-height: 1.5
+  }
+
+  .s-hint {
+    font-size: .77rem;
+    color: rgba(255, 255, 255, .35)
+  }
+
+  .s-slider-row {
+    display: flex;
+    align-items: center;
+    gap: 12px;
+    margin-bottom: 10px
+  }
+
+  .s-slider-badge {
+    font-size: .72rem;
+    font-weight: 600;
+    padding: 3px 8px;
+    border-radius: 6px;
+    white-space: nowrap
+  }
+
+  .s-slider-badge.strict {
+    background: rgba(239, 68, 68, .15);
+    color: #f87171
+  }
+
+  .s-slider-badge.lenient {
+    background: rgba(16, 185, 129, .15);
+    color: #34d399
+  }
+
+  .s-slider-wrap {
+    flex: 1
+  }
+
+  .s-slider-wrap input[type=range] {
+    width: 100%;
+    -webkit-appearance: none;
+    appearance: none;
+    height: 6px;
+    border-radius: 3px;
+    background: rgba(255, 255, 255, .12);
+    outline: none;
+    cursor: pointer
+  }
+
+  .s-slider-wrap input[type=range]::-webkit-slider-thumb {
+    -webkit-appearance: none;
+    width: 20px;
+    height: 20px;
+    border-radius: 50%;
+    background: linear-gradient(135deg, #8b5cf6, #6d28d9);
+    cursor: pointer;
+    border: 3px solid #14171a;
+    box-shadow: 0 2px 8px rgba(139, 92, 246, .5);
+    transition: transform .15s
+  }
+
+  .s-slider-wrap input[type=range]::-webkit-slider-thumb:hover {
+    transform: scale(1.15)
+  }
+
+  .s-slider-value-row {
+    display: flex;
+    align-items: center;
+    justify-content: space-between;
+    font-size: .8rem;
+    color: rgba(255, 255, 255, .5)
+  }
+
+  .s-slider-value-row strong {
+    color: #a78bfa
+  }
+
+  .s-number-row {
+    display: flex;
+    align-items: center;
+    gap: 12px;
+    margin-bottom: 10px
+  }
+
+  .s-num-btn {
+    width: 40px;
+    height: 40px;
+    border-radius: 10px;
+    border: 1px solid rgba(255, 255, 255, .15);
+    background: rgba(255, 255, 255, .07);
+    color: #e2e8f0;
+    font-size: 1.2rem;
+    cursor: pointer;
+    transition: all .15s;
+    flex-shrink: 0
+  }
+
+  .s-num-btn:hover {
+    background: rgba(99, 102, 241, .25);
+    border-color: #6366f1
+  }
+
+  .s-number-display {
+    display: flex;
+    align-items: center;
+    gap: 8px;
+    flex: 1
+  }
+
+  .s-number-display input {
+    flex: 1;
+    background: rgba(255, 255, 255, .07);
+    border: 1px solid rgba(255, 255, 255, .12);
+    border-radius: 10px;
+    padding: 10px 14px;
+    color: #e2e8f0;
+    font-size: 1rem;
+    font-weight: 700;
+    text-align: center;
+    outline: none
+  }
+
+  .s-number-display input:focus {
+    border-color: #6366f1
+  }
+
+  .s-num-unit {
+    font-size: .82rem;
+    color: rgba(255, 255, 255, .45)
+  }
+
+  .account-grid {
+    display: grid;
+    grid-template-columns: 1fr 1fr;
+    gap: 20px
+  }
+
+  .account-card {
+    display: flex;
+    flex-direction: column;
+    gap: 20px
+  }
+
+  .account-card-header {
+    display: flex;
+    align-items: center;
+    gap: 16px;
+    padding-bottom: 20px;
+    border-bottom: 1px solid rgba(255, 255, 255, .07)
+  }
+
+  .account-avatar {
+    width: 64px;
+    height: 64px;
+    border-radius: 50%;
+    overflow: hidden;
+    flex-shrink: 0;
+    border: 2px solid rgba(139, 92, 246, .4)
+  }
+
+  .account-avatar-img {
+    width: 100%;
+    height: 100%;
+    object-fit: cover
+  }
+
+  .account-avatar-placeholder {
+    width: 100%;
+    height: 100%;
+    background: linear-gradient(135deg, #6366f1, #8b5cf6);
+    display: flex;
+    align-items: center;
+    justify-content: center;
+    font-size: 1.5rem;
+    font-weight: 700;
+    color: #fff
+  }
+
+  .account-meta h3 {
+    font-size: 1rem;
+    font-weight: 700;
+    color: #e2e8f0;
+    margin: 0 0 4px
+  }
+
+  .account-role-badge {
+    display: inline-block;
+    padding: 2px 10px;
+    background: rgba(139, 92, 246, .2);
+    color: #a78bfa;
+    border-radius: 20px;
+    font-size: .75rem;
+    font-weight: 600;
+    margin-bottom: 4px
+  }
+
+  .account-username {
+    font-size: .8rem;
+    color: rgba(255, 255, 255, .4);
+    margin: 0
+  }
+
+  .s-card-header-inner {
+    display: flex;
+    align-items: center;
+    gap: 14px;
+    margin-bottom: 20px;
+    padding-bottom: 20px;
+    border-bottom: 1px solid rgba(255, 255, 255, .07)
+  }
+
+  .s-card-header-inner .s-card-icon {
+    margin-bottom: 0
+  }
+
+  .s-card-title {
+    font-size: 1rem;
+    font-weight: 700;
+    color: #e2e8f0;
+    margin: 0
+  }
+
+  .s-form-group {
+    margin-bottom: 16px
+  }
+
+  .s-input {
+    width: 100%;
+    box-sizing: border-box;
+    background: rgba(255, 255, 255, .06);
+    border: 1px solid rgba(255, 255, 255, .12);
+    border-radius: 10px;
+    padding: 11px 14px;
+    color: #e2e8f0;
+    font-size: .88rem;
+    outline: none;
+    transition: border-color .2s;
+    margin-top: 6px
+  }
+
+  .s-input:focus {
+    border-color: #6366f1;
+    background: rgba(99, 102, 241, .08)
+  }
+
+  .s-form-actions {
+    display: flex;
+    justify-content: flex-end;
+    margin-top: 8px
+  }
+
+  .s-pw-wrap {
+    position: relative
+  }
+
+  .s-pw-wrap .s-input {
+    padding-right: 44px
+  }
+
+  .s-pw-toggle {
+    position: absolute;
+    right: 12px;
+    top: 50%;
+    transform: translateY(-50%);
+    background: none;
+    border: none;
+    color: rgba(255, 255, 255, .4);
+    cursor: pointer;
+    padding: 4px;
+    margin-top: 3px
+  }
+
+  .s-pw-toggle:hover {
+    color: #a78bfa
+  }
+
+  .pw-strength-bar {
+    height: 4px;
+    background: rgba(255, 255, 255, .1);
+    border-radius: 2px;
+    margin-top: 8px;
+    overflow: hidden
+  }
+
+  .pw-strength-fill {
+    height: 100%;
+    border-radius: 2px;
+    transition: width .3s, background .3s;
+    width: 0%
+  }
+
+  .pw-strength-label {
+    font-size: .75rem;
+    color: rgba(255, 255, 255, .4);
+    margin-top: 4px;
+    display: block
+  }
+
+  .status-cards-grid {
+    display: grid;
+    grid-template-columns: 1fr 1fr 1fr;
+    gap: 20px
+  }
+
+  .status-group-card {
+    background: rgba(255, 255, 255, .04);
+    border: 1px solid rgba(255, 255, 255, .09);
+    border-radius: 16px;
+    padding: 20px 22px
+  }
+
+  .status-group-title {
+    display: flex;
+    align-items: center;
+    gap: 8px;
+    font-size: .8rem;
+    font-weight: 700;
+    color: rgba(255, 255, 255, .5);
+    text-transform: uppercase;
+    letter-spacing: .08em;
+    margin: 0 0 16px;
+    padding-bottom: 12px;
+    border-bottom: 1px solid rgba(255, 255, 255, .06)
+  }
+
+  .status-rows {
+    display: flex;
+    flex-direction: column;
+    gap: 12px
+  }
+
+  .status-row {
+    display: flex;
+    justify-content: space-between;
+    align-items: center;
+    gap: 12px;
+    font-size: .84rem
+  }
+
+  .status-key {
+    color: rgba(255, 255, 255, .5);
+    flex-shrink: 0
+  }
+
+  .status-val {
+    color: #e2e8f0;
+    font-weight: 500;
+    text-align: right
+  }
+
+  .status-val.mono {
+    font-family: monospace;
+    font-size: .78rem;
+    color: #a78bfa
+  }
+
+  .status-badge {
+    display: inline-block;
+    padding: 2px 10px;
+    border-radius: 20px;
+    font-size: .75rem;
+    font-weight: 600
+  }
+
+  .badge-green {
+    background: rgba(16, 185, 129, .15);
+    color: #34d399
+  }
+
+  .badge-yellow {
+    background: rgba(245, 158, 11, .15);
+    color: #fbbf24
+  }
+
+  .badge-red {
+    background: rgba(239, 68, 68, .15);
+    color: #f87171
+  }
+
+  .s-live-badge {
+    display: flex;
+    align-items: center;
+    gap: 7px;
+    font-size: .78rem;
+    font-weight: 600;
+    color: #34d399;
+    background: rgba(16, 185, 129, .12);
+    border: 1px solid rgba(16, 185, 129, .25);
+    padding: 6px 14px;
+    border-radius: 20px;
+    flex-shrink: 0
+  }
+
+  .s-live-dot {
+    width: 7px;
+    height: 7px;
+    border-radius: 50%;
+    background: #34d399;
+    animation: livePulse 1.5s infinite
+  }
+
+  @keyframes livePulse {
+
+    0%,
+    100% {
+      opacity: 1;
+      transform: scale(1)
+    }
+
+    50% {
+      opacity: .5;
+      transform: scale(.8)
+    }
+  }
+
+  .logs-preview-card {
+    background: rgba(255, 255, 255, .04);
+    border: 1px solid rgba(255, 255, 255, .09);
+    border-radius: 16px;
+    overflow: hidden
+  }
+
+  .logs-preview-header {
+    display: flex;
+    align-items: center;
+    justify-content: space-between;
+    padding: 16px 20px;
+    border-bottom: 1px solid rgba(255, 255, 255, .07)
+  }
+
+  .logs-preview-title {
+    font-size: .88rem;
+    font-weight: 600;
+    color: #e2e8f0
+  }
+
+  .logs-count-badge {
+    font-size: .75rem;
+    color: rgba(255, 255, 255, .4);
+    background: rgba(255, 255, 255, .07);
+    padding: 3px 10px;
+    border-radius: 20px
+  }
+
+  .logs-table-wrap {
+    max-height: 420px;
+    overflow-y: auto
+  }
+
+  .logs-table-wrap::-webkit-scrollbar {
+    width: 4px
+  }
+
+  .logs-table-wrap::-webkit-scrollbar-thumb {
+    background: rgba(255, 255, 255, .15);
+    border-radius: 2px
+  }
+
+  .logs-mini-table {
+    width: 100%;
+    border-collapse: collapse;
+    font-size: .82rem
+  }
+
+  .logs-mini-table th {
+    padding: 10px 14px;
+    text-align: left;
+    font-size: .73rem;
+    font-weight: 700;
+    color: rgba(255, 255, 255, .35);
+    text-transform: uppercase;
+    letter-spacing: .06em;
+    background: rgba(255, 255, 255, .03);
+    position: sticky;
+    top: 0
+  }
+
+  .logs-mini-table td {
+    padding: 9px 14px;
+    color: rgba(255, 255, 255, .75);
+    border-top: 1px solid rgba(255, 255, 255, .05)
+  }
+
+  .logs-mini-table tr:hover td {
+    background: rgba(255, 255, 255, .03)
+  }
+
+  .log-status-dot {
+    display: inline-block;
+    width: 7px;
+    height: 7px;
+    border-radius: 50%;
+    margin-right: 6px;
+    vertical-align: middle
+  }
+
+  .dot-success {
+    background: #34d399
+  }
+
+  .dot-failed {
+    background: #f87171
+  }
+
+  .dot-neutral {
+    background: #fbbf24
+  }
+
+  .s-toast {
+    display: none;
+    align-items: center;
+    gap: 10px;
+    margin-top: 14px;
+    padding: 12px 16px;
+    border-radius: 10px;
+    font-size: .84rem;
+    font-weight: 500
+  }
+
+  .s-toast.show {
+    display: flex;
+    animation: fadeSlideIn .25s ease
+  }
+
+  .s-toast.success {
+    background: rgba(16, 185, 129, .15);
+    border: 1px solid rgba(16, 185, 129, .3);
+    color: #34d399
+  }
+
+  .s-toast.error {
+    background: rgba(239, 68, 68, .15);
+    border: 1px solid rgba(239, 68, 68, .3);
+    color: #f87171
+  }
+
+  .s-loading-spinner {
+    display: flex;
+    flex-direction: column;
+    align-items: center;
+    gap: 12px;
+    padding: 40px;
+    color: rgba(255, 255, 255, .35);
+    font-size: .85rem
+  }
+
+  .spinner-ring {
+    width: 32px;
+    height: 32px;
+    border: 3px solid rgba(255, 255, 255, .08);
+    border-top-color: #8b5cf6;
+    border-radius: 50%;
+    animation: spin .8s linear infinite
+  }
+
+  @keyframes spin {
+    to {
+      transform: rotate(360deg)
+    }
+  }
+
+  @media(max-width:900px) {
+
+    .settings-cards-grid,
+    .account-grid,
+    .status-cards-grid {
+      grid-template-columns: 1fr
+    }
+
+    .stab {
+      font-size: .78rem;
+      padding: 9px 12px
+    }
+
+    .stab svg {
+      display: none
+    }
+  }
+</style>
+
 <script>
-  // Handle slider value display
-  const sliders = document.querySelectorAll('.setting-slider');
-  sliders.forEach(slider => {
-    slider.addEventListener('input', function() {
-      this.parentElement.querySelector('.slider-value').textContent = this.value + '%';
-    });
+  function switchTab(tabId, btn) {
+    document.querySelectorAll('.stab').forEach(function (b) { b.classList.remove('active') });
+    document.querySelectorAll('.stab-panel').forEach(function (p) { p.classList.remove('active') });
+    btn.classList.add('active');
+    document.getElementById('tab-' + tabId).classList.add('active');
+    if (tabId === 'logs') loadLogsPreview();
+    if (tabId === 'status') refreshStatusThresholds(null);
+  }
+  function updateSlider(input, labelId, fmt) {
+    var el = document.getElementById(labelId);
+    if (el) el.textContent = fmt(input.value);
+  }
+  function nudgeScan(delta) {
+    var inp = document.getElementById('btScan');
+    var val = Math.round((parseFloat(inp.value) + delta) * 2) / 2;
+    inp.value = Math.max(1, Math.min(30, val));
+  }
+  window.addEventListener('DOMContentLoaded', function () {
+    var ft = document.getElementById('faceTolerance');
+    if (ft) updateSlider(ft, 'faceToleranceVal', function (v) { return (v / 100).toFixed(2) });
+    var br = document.getElementById('btRssi');
+    if (br) updateSlider(br, 'btRssiVal', function (v) { return v + ' dBm' });
   });
+  function showToast(id, type, msg, dur) {
+    dur = dur || 4000;
+    var el = document.getElementById(id);
+    if (!el) return;
+    var icon = type === 'success'
+      ? '<svg width="16" height="16" fill="none" stroke="currentColor" stroke-width="2" viewBox="0 0 24 24"><polyline points="20 6 9 17 4 12"/></svg>'
+      : '<svg width="16" height="16" fill="none" stroke="currentColor" stroke-width="2" viewBox="0 0 24 24"><circle cx="12" cy="12" r="10"/><line x1="12" y1="8" x2="12" y2="12"/><line x1="12" y1="16" x2="12.01" y2="16"/></svg>';
+    el.className = 's-toast show ' + type;
+    el.innerHTML = icon + '<span>' + msg + '</span>';
+    clearTimeout(el._t);
+    el._t = setTimeout(function () { el.classList.remove('show') }, dur);
+  }
+  async function saveThresholds() {
+    var btn = document.getElementById('saveThresholdsBtn');
+    var orig = btn.innerHTML;
+    btn.disabled = true;
+    btn.innerHTML = '<div class="spinner-ring" style="width:15px;height:15px;border-width:2px;display:inline-block;vertical-align:middle;margin-right:6px"></div> Saving…';
+    var payload = {
+      face_tolerance: parseFloat(document.getElementById('faceTolerance').value) / 100,
+      bt_rssi: parseInt(document.getElementById('btRssi').value),
+      bt_scan: parseFloat(document.getElementById('btScan').value)
+    };
+    try {
+      var res = await fetch('/settings/update-thresholds', {
+        method: 'POST',
+        headers: { 'Content-Type': 'application/json', 'X-CSRFToken': getCSRF() },
+        body: JSON.stringify(payload)
+      });
+      var data = await res.json();
+      if (data.success) {
+        showToast('thresholdsToast', 'success', 'Saved — Face: ' + data.face_tolerance + ', RSSI: ' + data.bt_rssi + ' dBm, Scan: ' + data.bt_scan + 's');
+        refreshStatusThresholds(data);
+      } else {
+        showToast('thresholdsToast', 'error', data.error || 'Failed to save.');
+      }
+    } catch (err) { showToast('thresholdsToast', 'error', 'Network error: ' + err.message) }
+    btn.disabled = false;
+    btn.innerHTML = orig;
+  }
+  function refreshStatusThresholds(data) {
+    if (!data) {
+      fetch('/api/settings/status').then(function (r) { return r.json() }).then(function (d) { if (d.success) refreshStatusThresholds(d) });
+      return;
+    }
+    var ft = document.getElementById('liveStatFaceTol');
+    var br = document.getElementById('liveStatBtRssi');
+    var bs = document.getElementById('liveStatBtScan');
+    if (ft && data.face_tolerance !== undefined) ft.textContent = data.face_tolerance;
+    if (br && data.bt_rssi !== undefined) br.textContent = data.bt_rssi + ' dBm';
+    if (bs && data.bt_scan !== undefined) bs.textContent = data.bt_scan + 's';
+  }
+  async function saveProfile(event) {
+    event.preventDefault();
+    var btn = event.submitter;
+    var orig = btn.innerHTML;
+    btn.disabled = true;
+    btn.innerHTML = '<div class="spinner-ring" style="width:14px;height:14px;border-width:2px;display:inline-block;vertical-align:middle;margin-right:6px"></div> Saving…';
+    var payload = {
+      full_name: document.getElementById('profileFullName').value.trim(),
+      email: document.getElementById('profileEmail').value.trim(),
+      phone: document.getElementById('profilePhone').value.trim()
+    };
+    try {
+      var res = await fetch('/settings/update-profile', {
+        method: 'POST',
+        headers: { 'Content-Type': 'application/json', 'X-CSRFToken': getCSRF() },
+        body: JSON.stringify(payload)
+      });
+      var data = await res.json();
+      if (data.success) showToast('profileToast', 'success', 'Profile updated successfully.');
+      else showToast('profileToast', 'error', data.error || 'Failed to update profile.');
+    } catch (err) { showToast('profileToast', 'error', 'Network error: ' + err.message) }
+    btn.disabled = false;
+    btn.innerHTML = orig;
+  }
+  async function changePassword(event) {
+    event.preventDefault();
+    var btn = event.submitter;
+    var orig = btn.innerHTML;
+    btn.disabled = true;
+    btn.innerHTML = '<div class="spinner-ring" style="width:14px;height:14px;border-width:2px;display:inline-block;vertical-align:middle;margin-right:6px"></div> Updating…';
+    var payload = {
+      current_password: document.getElementById('currentPw').value,
+      new_password: document.getElementById('newPw').value,
+      confirm_password: document.getElementById('confirmPw').value
+    };
+    try {
+      var res = await fetch('/settings/change-password', {
+        method: 'POST',
+        headers: { 'Content-Type': 'application/json', 'X-CSRFToken': getCSRF() },
+        body: JSON.stringify(payload)
+      });
+      var data = await res.json();
+      if (data.success) {
+        showToast('passwordToast', 'success', 'Password updated! You may need to log in again.');
+        document.getElementById('passwordForm').reset();
+        document.getElementById('pwStrengthFill').style.width = '0%';
+        document.getElementById('pwStrengthLabel').textContent = '';
+      } else {
+        showToast('passwordToast', 'error', data.error || 'Failed to update password.');
+      }
+    } catch (err) { showToast('passwordToast', 'error', 'Network error: ' + err.message) }
+    btn.disabled = false;
+    btn.innerHTML = orig;
+  }
+  function checkPwStrength(pw) {
+    var score = 0;
+    if (pw.length >= 8) score++;
+    if (pw.length >= 12) score++;
+    if (/[A-Z]/.test(pw)) score++;
+    if (/[0-9]/.test(pw)) score++;
+    if (/[^A-Za-z0-9]/.test(pw)) score++;
+    var levels = [
+      { pct: '0%', color: 'transparent', text: '' },
+      { pct: '20%', color: '#ef4444', text: 'Very weak' },
+      { pct: '40%', color: '#f97316', text: 'Weak' },
+      { pct: '60%', color: '#eab308', text: 'Fair' },
+      { pct: '80%', color: '#22d3ee', text: 'Strong' },
+      { pct: '100%', color: '#22c55e', text: 'Very strong' }
+    ];
+    var lvl = levels[Math.min(score, 5)];
+    var fill = document.getElementById('pwStrengthFill');
+    var label = document.getElementById('pwStrengthLabel');
+    fill.style.width = lvl.pct;
+    fill.style.background = lvl.color;
+    label.textContent = lvl.text;
+    label.style.color = lvl.color;
+  }
+  function togglePw(inputId, btn) {
+    var inp = document.getElementById(inputId);
+    var isText = inp.type === 'text';
+    inp.type = isText ? 'password' : 'text';
+    btn.style.color = isText ? 'rgba(255,255,255,0.4)' : '#a78bfa';
+  }
+  async function loadLogsPreview() {
+    var wrap = document.getElementById('logsTableWrap');
+    var badge = document.getElementById('logsCountBadge');
+    wrap.innerHTML = '<div class="s-loading-spinner"><div class="spinner-ring"></div><span>Loading audit log…</span></div>';
+    badge.textContent = 'Loading…';
+    try {
+      var res = await fetch('/api/notifications');
+      var data = await res.json();
+      var items = data.notifications || [];
+      if (!items.length) {
+        wrap.innerHTML = '<p style="text-align:center;padding:32px;color:rgba(255,255,255,.35)">No log entries found.</p>';
+        badge.textContent = '0 events';
+        return;
+      }
+      badge.textContent = items.length + ' events';
+      var rows = items.slice(0, 50).map(function (item) {
+        var failed = item.status === 'Failed' || item.type === 'danger';
+        var success = item.status === 'Success' || item.type === 'success';
+        var dot = failed ? 'dot-failed' : success ? 'dot-success' : 'dot-neutral';
+        var ts = (item.time || item.timestamp || '').replace('T', ' ').slice(0, 19);
+        return '<tr><td style="color:rgba(255,255,255,.4);font-size:.78rem">' + ts + '</td>'
+          + '<td><strong>' + (item.title || item.event_type || '—') + '</strong></td>'
+          + '<td>' + (item.username || '—') + '</td>'
+          + '<td>' + (item.access_point || item.subtitle || '—') + '</td>'
+          + '<td><span class="log-status-dot ' + dot + '"></span>' + (item.status || '—') + '</td></tr>';
+      }).join('');
+      wrap.innerHTML = '<table class="logs-mini-table"><thead><tr><th>Timestamp</th><th>Event</th><th>User</th><th>Location</th><th>Status</th></tr></thead><tbody>' + rows + '</tbody></table>';
+    } catch (err) {
+      wrap.innerHTML = '<p style="text-align:center;padding:32px;color:#f87171">Failed to load: ' + err.message + '</p>';
+      badge.textContent = 'Error';
+    }
+  }
+  function getCSRF() {
+    // Flask-WTF renders the token into <meta name="csrf-token"> (base.html line 6)
+    var meta = document.querySelector('meta[name="csrf-token"]');
+    return meta ? meta.getAttribute('content') : '';
+  }
 </script>
+
+{% endblock %}
+html[data-theme="light"] .logs-count-badge{background:#f1f5f9;color:#475569}
+html[data-theme="light"] .logs-mini-table th{background:#f8fafc;color:#475569;border-bottom:1px solid #e2e8f0}
+html[data-theme="light"] .logs-mini-table td{color:#1e293b;border-top:1px solid #f1f5f9}
+html[data-theme="light"] .logs-mini-table tr:hover td{background:#f8fafc}
+html[data-theme="light"] .theme-choice-box{background:#f8fafc;border-color:#e2e8f0}
+html[data-theme="light"] .theme-choice-box.is-selected{border-color:#814BEE;background:rgba(129,75,238,.06);box-shadow:0
+0 16px rgba(129,75,238,.15)}
+html[data-theme="light"] .theme-choice-title{color:#0f172a}
+html[data-theme="light"] .theme-choice-desc{color:#64748b}
+html[data-theme="light"] .theme-quick-switch-bar{background:#f8fafc;border-color:#e2e8f0}
+html[data-theme="light"] .quick-switch-title{color:#0f172a}
+html[data-theme="light"] .quick-switch-subtitle{color:#64748b}
+html[data-theme="light"] .theme-toggle-switch-btn{background:#814BEE;border-color:#814BEE}
+html[data-theme="light"] .theme-toggle-switch-thumb{transform:translateX(24px);background:#ffffff;color:#814BEE}
+html[data-theme="light"] .theme-toggle-switch-thumb .icon-moon{display:none}
+html[data-theme="light"] .theme-toggle-switch-thumb .icon-sun{display:block}
+html[data-theme="light"] .palette-swatch-item{background:#f8fafc;border-color:#e2e8f0}
+html[data-theme="light"] .palette-swatch-meta strong{color:#0f172a}
+html[data-theme="light"] .palette-swatch-meta span{color:#64748b}
+html[data-theme="light"] .theme-tip-box{background:rgba(129,75,238,.07);color:#814BEE;border-color:rgba(129,75,238,.2)}
+html[data-theme="light"] .s-num-btn{background:#f1f5f9;border-color:#cbd5e1;color:#0f172a}
+html[data-theme="light"] .s-number-display input{background:#f8fafc;border-color:#cbd5e1;color:#0f172a}
+html[data-theme="light"] .s-slider-wrap input[type=range]{background:#e2e8f0}
+
+@media(max-width:900px){
+.settings-cards-grid,.account-grid,.status-cards-grid,.appearance-grid{grid-template-columns:1fr}
+.theme-cards-container{grid-template-columns:1fr}
+.stab{font-size:.78rem;padding:9px 12px}
+.stab svg{display:none}
+}
+</style>
+
+<script>
+  function selectTheme(theme) {
+    if (window.FaceAuthTheme && window.FaceAuthTheme.apply) {
+      window.FaceAuthTheme.apply(theme);
+    } else {
+      if (theme === 'light') {
+        document.documentElement.setAttribute('data-theme', 'light');
+        localStorage.setItem('faceauth-theme', 'light');
+      } else {
+        document.documentElement.removeAttribute('data-theme');
+        localStorage.setItem('faceauth-theme', 'dark');
+      }
+    }
+    updateAppearanceUI();
+  }
+
+  function toggleThemeFromSettings() {
+    if (window.FaceAuthTheme && window.FaceAuthTheme.toggle) {
+      window.FaceAuthTheme.toggle();
+    } else {
+      var cur = document.documentElement.getAttribute('data-theme') === 'light' ? 'light' : 'dark';
+      selectTheme(cur === 'light' ? 'dark' : 'light');
+    }
+    updateAppearanceUI();
+  }
+
+  function updateAppearanceUI() {
+    var isLight = document.documentElement.getAttribute('data-theme') === 'light';
+    var darkBox = document.getElementById('themeChoiceDark');
+    var lightBox = document.getElementById('themeChoiceLight');
+    var sub = document.getElementById('themeStatusSubtitle');
+    if (darkBox && lightBox) {
+      if (isLight) {
+        darkBox.classList.remove('is-selected');
+        lightBox.classList.add('is-selected');
+        if (sub) sub.textContent = 'Light mode is currently active (White & #814BEE)';
+      } else {
+        lightBox.classList.remove('is-selected');
+        darkBox.classList.add('is-selected');
+        if (sub) sub.textContent = 'Dark mode is currently active (Cyberpunk Dark & Cyan)';
+      }
+    }
+  }
+
+  window.addEventListener('themechange', updateAppearanceUI);
+  window.addEventListener('DOMContentLoaded', updateAppearanceUI);
+  function switchTab(tabId, btn) {
+    document.querySelectorAll('.stab').forEach(function (b) { b.classList.remove('active') });
+    document.querySelectorAll('.stab-panel').forEach(function (p) { p.classList.remove('active') });
+    btn.classList.add('active');
+    document.getElementById('tab-' + tabId).classList.add('active');
+    if (tabId === 'logs') loadLogsPreview();
+    if (tabId === 'status') refreshStatusThresholds(null);
+  }
+  function updateSlider(input, labelId, fmt) {
+    var el = document.getElementById(labelId);
+    if (el) el.textContent = fmt(input.value);
+  }
+  function nudgeScan(delta) {
+    var inp = document.getElementById('btScan');
+    var val = Math.round((parseFloat(inp.value) + delta) * 2) / 2;
+    inp.value = Math.max(1, Math.min(30, val));
+  }
+  window.addEventListener('DOMContentLoaded', function () {
+    var ft = document.getElementById('faceTolerance');
+    if (ft) updateSlider(ft, 'faceToleranceVal', function (v) { return (v / 100).toFixed(2) });
+    var br = document.getElementById('btRssi');
+    if (br) updateSlider(br, 'btRssiVal', function (v) { return v + ' dBm' });
+  });
+  function showToast(id, type, msg, dur) {
+    dur = dur || 4000;
+    var el = document.getElementById(id);
+    if (!el) return;
+    var icon = type === 'success'
+      ? '<svg width="16" height="16" fill="none" stroke="currentColor" stroke-width="2" viewBox="0 0 24 24"><polyline points="20 6 9 17 4 12"/></svg>'
+      : '<svg width="16" height="16" fill="none" stroke="currentColor" stroke-width="2" viewBox="0 0 24 24"><circle cx="12" cy="12" r="10"/><line x1="12" y1="8" x2="12" y2="12"/><line x1="12" y1="16" x2="12.01" y2="16"/></svg>';
+    el.className = 's-toast show ' + type;
+    el.innerHTML = icon + '<span>' + msg + '</span>';
+    clearTimeout(el._t);
+    el._t = setTimeout(function () { el.classList.remove('show') }, dur);
+  }
+  async function saveThresholds() {
+    var btn = document.getElementById('saveThresholdsBtn');
+    var orig = btn.innerHTML;
+    btn.disabled = true;
+    btn.innerHTML = '<div class="spinner-ring" style="width:15px;height:15px;border-width:2px;display:inline-block;vertical-align:middle;margin-right:6px"></div> Saving…';
+    var payload = {
+      face_tolerance: parseFloat(document.getElementById('faceTolerance').value) / 100,
+      bt_rssi: parseInt(document.getElementById('btRssi').value),
+      bt_scan: parseFloat(document.getElementById('btScan').value)
+    };
+    try {
+      var res = await fetch('/settings/update-thresholds', {
+        method: 'POST',
+        headers: { 'Content-Type': 'application/json', 'X-CSRFToken': getCSRF() },
+        body: JSON.stringify(payload)
+      });
+      var data = await res.json();
+      if (data.success) {
+        showToast('thresholdsToast', 'success', 'Saved — Face: ' + data.face_tolerance + ', RSSI: ' + data.bt_rssi + ' dBm, Scan: ' + data.bt_scan + 's');
+        refreshStatusThresholds(data);
+      } else {
+        showToast('thresholdsToast', 'error', data.error || 'Failed to save.');
+      }
+    } catch (err) { showToast('thresholdsToast', 'error', 'Network error: ' + err.message) }
+    btn.disabled = false;
+    btn.innerHTML = orig;
+  }
+  function refreshStatusThresholds(data) {
+    if (!data) {
+      fetch('/api/settings/status').then(function (r) { return r.json() }).then(function (d) { if (d.success) refreshStatusThresholds(d) });
+      return;
+    }
+    var ft = document.getElementById('liveStatFaceTol');
+    var br = document.getElementById('liveStatBtRssi');
+    var bs = document.getElementById('liveStatBtScan');
+    if (ft && data.face_tolerance !== undefined) ft.textContent = data.face_tolerance;
+    if (br && data.bt_rssi !== undefined) br.textContent = data.bt_rssi + ' dBm';
+    if (bs && data.bt_scan !== undefined) bs.textContent = data.bt_scan + 's';
+  }
+  async function saveProfile(event) {
+    event.preventDefault();
+    var btn = event.submitter;
+    var orig = btn.innerHTML;
+    btn.disabled = true;
+    btn.innerHTML = '<div class="spinner-ring" style="width:14px;height:14px;border-width:2px;display:inline-block;vertical-align:middle;margin-right:6px"></div> Saving…';
+    var payload = {
+      full_name: document.getElementById('profileFullName').value.trim(),
+      email: document.getElementById('profileEmail').value.trim(),
+      phone: document.getElementById('profilePhone').value.trim()
+    };
+    try {
+      var res = await fetch('/settings/update-profile', {
+        method: 'POST',
+        headers: { 'Content-Type': 'application/json', 'X-CSRFToken': getCSRF() },
+        body: JSON.stringify(payload)
+      });
+      var data = await res.json();
+      if (data.success) showToast('profileToast', 'success', 'Profile updated successfully.');
+      else showToast('profileToast', 'error', data.error || 'Failed to update profile.');
+    } catch (err) { showToast('profileToast', 'error', 'Network error: ' + err.message) }
+    btn.disabled = false;
+    btn.innerHTML = orig;
+  }
+  async function changePassword(event) {
+    event.preventDefault();
+    var btn = event.submitter;
+    var orig = btn.innerHTML;
+    btn.disabled = true;
+    btn.innerHTML = '<div class="spinner-ring" style="width:14px;height:14px;border-width:2px;display:inline-block;vertical-align:middle;margin-right:6px"></div> Updating…';
+    var payload = {
+      current_password: document.getElementById('currentPw').value,
+      new_password: document.getElementById('newPw').value,
+      confirm_password: document.getElementById('confirmPw').value
+    };
+    try {
+      var res = await fetch('/settings/change-password', {
+        method: 'POST',
+        headers: { 'Content-Type': 'application/json', 'X-CSRFToken': getCSRF() },
+        body: JSON.stringify(payload)
+      });
+      var data = await res.json();
+      if (data.success) {
+        showToast('passwordToast', 'success', 'Password updated! You may need to log in again.');
+        document.getElementById('passwordForm').reset();
+        document.getElementById('pwStrengthFill').style.width = '0%';
+        document.getElementById('pwStrengthLabel').textContent = '';
+      } else {
+        showToast('passwordToast', 'error', data.error || 'Failed to update password.');
+      }
+    } catch (err) { showToast('passwordToast', 'error', 'Network error: ' + err.message) }
+    btn.disabled = false;
+    btn.innerHTML = orig;
+  }
+  function checkPwStrength(pw) {
+    var score = 0;
+    if (pw.length >= 8) score++;
+    if (pw.length >= 12) score++;
+    if (/[A-Z]/.test(pw)) score++;
+    if (/[0-9]/.test(pw)) score++;
+    if (/[^A-Za-z0-9]/.test(pw)) score++;
+    var levels = [
+      { pct: '0%', color: 'transparent', text: '' },
+      { pct: '20%', color: '#ef4444', text: 'Very weak' },
+      { pct: '40%', color: '#f97316', text: 'Weak' },
+      { pct: '60%', color: '#eab308', text: 'Fair' },
+      { pct: '80%', color: '#22d3ee', text: 'Strong' },
+      { pct: '100%', color: '#22c55e', text: 'Very strong' }
+    ];
+    var lvl = levels[Math.min(score, 5)];
+    var fill = document.getElementById('pwStrengthFill');
+    var label = document.getElementById('pwStrengthLabel');
+    fill.style.width = lvl.pct;
+    fill.style.background = lvl.color;
+    label.textContent = lvl.text;
+    label.style.color = lvl.color;
+  }
+  function togglePw(inputId, btn) {
+    var inp = document.getElementById(inputId);
+    var isText = inp.type === 'text';
+    inp.type = isText ? 'password' : 'text';
+    btn.style.color = isText ? 'rgba(255,255,255,0.4)' : '#a78bfa';
+  }
+  async function loadLogsPreview() {
+    var wrap = document.getElementById('logsTableWrap');
+    var badge = document.getElementById('logsCountBadge');
+    wrap.innerHTML = '<div class="s-loading-spinner"><div class="spinner-ring"></div><span>Loading audit log…</span></div>';
+    badge.textContent = 'Loading…';
+    try {
+      var res = await fetch('/api/notifications');
+      var data = await res.json();
+      var items = data.notifications || [];
+      if (!items.length) {
+        wrap.innerHTML = '<p style="text-align:center;padding:32px;color:rgba(255,255,255,.35)">No log entries found.</p>';
+        badge.textContent = '0 events';
+        return;
+      }
+      badge.textContent = items.length + ' events';
+      var rows = items.slice(0, 50).map(function (item) {
+        var failed = item.status === 'Failed' || item.type === 'danger';
+        var success = item.status === 'Success' || item.type === 'success';
+        var dot = failed ? 'dot-failed' : success ? 'dot-success' : 'dot-neutral';
+        var ts = (item.time || item.timestamp || '').replace('T', ' ').slice(0, 19);
+        return '<tr><td style="color:rgba(255,255,255,.4);font-size:.78rem">' + ts + '</td>'
+          + '<td><strong>' + (item.title || item.event_type || '—') + '</strong></td>'
+          + '<td>' + (item.username || '—') + '</td>'
+          + '<td>' + (item.access_point || item.subtitle || '—') + '</td>'
+          + '<td><span class="log-status-dot ' + dot + '"></span>' + (item.status || '—') + '</td></tr>';
+      }).join('');
+      wrap.innerHTML = '<table class="logs-mini-table"><thead><tr><th>Timestamp</th><th>Event</th><th>User</th><th>Location</th><th>Status</th></tr></thead><tbody>' + rows + '</tbody></table>';
+    } catch (err) {
+      wrap.innerHTML = '<p style="text-align:center;padding:32px;color:#f87171">Failed to load: ' + err.message + '</p>';
+      badge.textContent = 'Error';
+    }
+  }
+  function getCSRF() {
+    // Flask-WTF renders the token into <meta name="csrf-token"> (base.html line 6)
+    var meta = document.querySelector('meta[name="csrf-token"]');
+    return meta ? meta.getAttribute('content') : '';
+  }
+</script>
+
 {% endblock %}

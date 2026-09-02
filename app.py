@@ -9,11 +9,16 @@ Backend: AWS DynamoDB (users/logs/access-points) + S3 (photos) + Lambda (post-au
 """
 
 import base64
+import csv
+import io as _io
 import logging
 import os
+import platform
+import sys
 import threading
 import uuid
 from concurrent.futures import ThreadPoolExecutor
+from datetime import datetime, timezone
 from functools import wraps
 
 from dotenv import load_dotenv                                            # type: ignore[import-untyped]
@@ -31,6 +36,8 @@ import aws_s3                       # S3 — enrolled face photos
 import aws_lambda_client            # Lambda — post-auth event trigger
 import bluetooth_scanner as bt      # BLE proximity scanner
 import face_recognition_service as frs  # dlib face recognition
+import push_auth_service             # 2FA Push Authentication (HTML email button)
+from aws_iot_door import DoorTriggerController, trigger_door_unlock  # ESP32 door unlock via AWS IoT Core
 
 # ---------------------------------------------------------------------------
 # Bootstrap
@@ -38,12 +45,22 @@ import face_recognition_service as frs  # dlib face recognition
 
 load_dotenv()  # must be first — reads .env before any os.environ.get() calls
 
+# ── IoT door controller (module-level singleton so the consecutive-match
+#    counter persists across repeated HTTP requests from the browser) ──────────
+_door_controller = DoorTriggerController()
+FACE_TOLERANCE = float(os.environ.get("FACE_TOLERANCE", 0.55))
+_approval_events: dict = {}
+
 logging.basicConfig(
-    level=logging.INFO,
+    level=logging.WARNING,
     format="%(asctime)s [%(levelname)s] %(name)s: %(message)s",
     datefmt="%Y-%m-%d %H:%M:%S",
 )
 logger = logging.getLogger(__name__)
+
+# Silence noisy third-party loggers so the terminal stays clean
+for _noisy in ("werkzeug", "botocore", "boto3", "urllib3", "s3transfer"):
+    logging.getLogger(_noisy).setLevel(logging.ERROR)
 
 # ---------------------------------------------------------------------------
 # Application factory
@@ -72,6 +89,9 @@ ALLOWED_EXTENSIONS = {"png", "jpg", "jpeg", "gif", "webp"}
 BT_RSSI_THRESHOLD = int(os.environ.get("BT_RSSI_THRESHOLD", "-50"))
 BT_SCAN_DURATION  = float(os.environ.get("BT_SCAN_DURATION", "6.0"))
 
+# Face recognition tolerance (lower = stricter; default 0.55)
+FACE_TOLERANCE = float(os.environ.get("FACE_TOLERANCE", "0.55"))
+
 # ---------------------------------------------------------------------------
 # Database initialisation
 # ---------------------------------------------------------------------------
@@ -89,11 +109,11 @@ with app.app_context():
 
 def _prewarm_face_recognition() -> None:
     try:
-        import face_recognition as _fr  # type: ignore[import-untyped]
         import numpy as _np
+        fr = frs._get_fr()   # triggers lazy import — loads dlib models in background
         dummy = _np.zeros((100, 100, 3), dtype=_np.uint8)
-        _fr.face_locations(dummy)
-        _fr.face_encodings(dummy)
+        fr.face_locations(dummy)
+        fr.face_encodings(dummy)
         logger.info("[prewarm] face_recognition models loaded and ready.")
     except Exception as exc:
         logger.warning("[prewarm] face_recognition pre-warm skipped: %s", exc)
@@ -146,16 +166,30 @@ def _upload_photos_to_s3(files, username: str) -> list[str]:
 
     payloads = []
     for idx, f in enumerate(valid):
-        ext    = secure_filename(f.filename).rsplit(".", 1)[1].lower()
+        safe_name = secure_filename(f.filename or "")
+        ext = safe_name.rsplit(".", 1)[1].lower() if "." in safe_name else (f.filename.rsplit(".", 1)[1].lower() if f.filename and "." in f.filename else "jpg")
         s3_key = f"users/{username}/photos/sample_{idx}_{uuid.uuid4().hex[:6]}.{ext}"
-        payloads.append((f.read(), s3_key))
+        try:
+            data = f.read()
+            if data:
+                payloads.append((data, s3_key))
+        except Exception as exc:
+            logger.error("Failed reading upload file bytes: %s", exc)
+
+    if not payloads:
+        return []
 
     def _upload(item):
-        data, key = item
-        return aws_s3.upload_photo_bytes(data, key)
+        try:
+            data, key = item
+            return aws_s3.upload_photo_bytes(data, key)
+        except Exception as exc:
+            logger.error("S3 photo upload failed: %s", exc)
+            return None
 
-    with ThreadPoolExecutor(max_workers=len(payloads)) as pool:
-        return list(pool.map(_upload, payloads))
+    with ThreadPoolExecutor(max_workers=min(len(payloads), 10)) as pool:
+        res = list(pool.map(_upload, payloads))
+        return [r for r in res if r]
 
 
 # ===========================================================================
@@ -218,28 +252,179 @@ def logout():
 @app.route("/dashboard")
 @login_required
 def dashboard():
-    with ThreadPoolExecutor(max_workers=5) as pool:
-        f_granted = pool.submit(db.count_access_granted)
-        f_denied  = pool.submit(db.count_access_denied)
-        f_users   = pool.submit(db.count_active_users)
-        f_points  = pool.submit(db.count_active_access_points)
-        f_logs    = pool.submit(db.get_recent_logs, limit=5)
-
-        stats = {
-            "access_granted": f_granted.result(),
-            "access_denied":  f_denied.result(),
-            "active_users":   f_users.result(),
-            "active_points":  f_points.result(),
-        }
-        recent_logs = f_logs.result()
-
+    # Render the shell instantly — JS will fetch /api/dashboard-stats async
+    empty_stats = {
+        "access_granted": 0,
+        "access_denied":  0,
+        "active_users":   0,
+        "active_points":  0,
+        "success_rate":   0.0,
+    }
     return render_template(
         "dashboard.html",
         active_page="dashboard",
         operator_id=session.get("operator_id", "User"),
-        stats=stats,
-        recent_logs=recent_logs,
+        stats=empty_stats,
+        recent_logs=[],
+        chart_7days={"labels": [], "granted": [], "denied": []},
+        chart_breakdown=[],
     )
+
+
+@app.route("/api/dashboard-stats")
+@login_required
+def api_dashboard_stats():
+    """
+    Return all dashboard statistics as JSON for async page loading.
+    The dashboard HTML renders instantly; JS fetches this endpoint to populate numbers.
+    Cached aggressively — returns stale data up to 60 s old rather than blocking.
+    """
+    with ThreadPoolExecutor(max_workers=7) as pool:
+        f_granted   = pool.submit(db.count_access_granted)
+        f_denied    = pool.submit(db.count_access_denied)
+        f_users     = pool.submit(db.count_active_users)
+        f_points    = pool.submit(db.count_active_access_points)
+        f_logs      = pool.submit(db.get_recent_logs, limit=8)
+        f_chart7    = pool.submit(db.get_chart_data_7days)
+        f_breakdown = pool.submit(db.get_event_type_breakdown)
+
+        def _safe(fut, default):
+            try:
+                r = fut.result(timeout=15)
+                return r if r is not None else default
+            except Exception as exc:
+                logger.error("api_dashboard_stats error: %s", exc)
+                return default
+
+        granted     = int(_safe(f_granted, 0))
+        denied      = int(_safe(f_denied,  0))
+        users_cnt   = int(_safe(f_users,   0))
+        points_cnt  = int(_safe(f_points,  0))
+        recent_logs = _safe(f_logs, [])
+        chart_7days = _safe(f_chart7, {"labels": [], "granted": [], "denied": []})
+        chart_breakdown = _safe(f_breakdown, [])
+
+    total = granted + denied
+    success_rate = round((granted / total) * 100, 1) if total > 0 else 0.0
+
+    return jsonify({
+        "success": True,
+        "stats": {
+            "access_granted": granted,
+            "access_denied":  denied,
+            "active_users":   users_cnt,
+            "active_points":  points_cnt,
+            "success_rate":   success_rate,
+        },
+        "recent_logs": [
+            {
+                "event_type":   log.get("event_type", ""),
+                "username":     log.get("username", ""),
+                "access_point": log.get("access_point", ""),
+                "status":       log.get("status", ""),
+                "timestamp":    log.get("timestamp", ""),
+            }
+            for log in recent_logs
+        ],
+        "chart_7days":    chart_7days,
+        "chart_breakdown": chart_breakdown,
+    })
+
+
+# ===========================================================================
+# Routes — Notifications & Admin Profile API
+# ===========================================================================
+
+@app.route("/api/notifications", methods=["GET"])
+@login_required
+def api_notifications():
+    """
+    Return recent audit logs converted into structured notification items.
+    Categorized into user_activity, access_log, and system_alert.
+    """
+    recent_logs = db.get_recent_logs(limit=25)
+    notifications = []
+    
+    for log in recent_logs:
+        event_type = log.get("event_type", "System Event")
+        username = log.get("username", "System")
+        details = log.get("details", "")
+        access_point = log.get("access_point", "Dashboard")
+        timestamp = log.get("timestamp", "")
+        status = log.get("status", "Success")
+
+        category = "system"
+        icon_type = "info"
+        badge_color = "cyan"
+        title = event_type
+        
+        if event_type in ["User Created", "User Updated", "User Deleted", "BT MAC Updated"]:
+            category = "user_activity"
+            icon_type = "user"
+            badge_color = "purple" if "Created" in event_type else ("blue" if "Updated" in event_type else "red")
+        elif event_type in ["Access Granted", "Access Denied", "BT Proximity Check"]:
+            category = "access_log"
+            if event_type == "Access Granted":
+                icon_type = "check_circle"
+                badge_color = "green"
+            elif event_type == "Access Denied":
+                icon_type = "x_circle"
+                badge_color = "red"
+            else:
+                icon_type = "bluetooth"
+                badge_color = "cyan"
+        elif event_type in ["Login", "Logout"]:
+            category = "user_activity"
+            icon_type = "shield"
+            badge_color = "green" if event_type == "Login" else "orange"
+
+        notifications.append({
+            "id": str(log.get("id") or log.get("log_id") or uuid.uuid4()),
+            "title": title,
+            "username": username,
+            "access_point": access_point,
+            "status": status,
+            "details": details,
+            "timestamp": timestamp,
+            "category": category,
+            "icon_type": icon_type,
+            "badge_color": badge_color
+        })
+
+    return jsonify({
+        "success": True,
+        "notifications": notifications,
+        "unread_count": min(len(notifications), 5)
+    })
+
+
+@app.route("/api/profile", methods=["GET"])
+@login_required
+def api_profile():
+    """Return profile and session information for the active logged-in administrator."""
+    username = session.get("operator_id", "admin")
+    user = db.get_user_by_username(username)
+    
+    user_info = {
+        "username": username,
+        "full_name": user.get("full_name", "System Administrator") if user else "System Administrator",
+        "email": user.get("email", "admin@faceauth.sec") if user else "admin@faceauth.sec",
+        "phone": user.get("phone", "+60 11-1234 5678") if user else "+60 11-1234 5678",
+        "role": user.get("role", "Super Administrator") if user else "Super Administrator",
+        "status": user.get("status", "Active") if user else "Active",
+        "photo_path": user.get("photo_path") if user else None,
+        "photos": user.get("photos", []) if user else [],
+        "created_at": user.get("created_at", "2026-01-01 08:00:00") if user else "2026-01-01 08:00:00",
+        "session_id": session.get("user_id", str(uuid.uuid4())[:8]),
+        "user_agent": request.user_agent.string if request.user_agent else "Mozilla/5.0 (Windows NT 10.0; Win64; x64)",
+        "ip_address": request.remote_addr or "127.0.0.1",
+        "security_level": "Tier-1 Root Access (2FA + FaceAuth)",
+        "db_sync": "AWS DynamoDB Active",
+    }
+    
+    return jsonify({"success": True, "profile": user_info})
+
+
 
 
 # ===========================================================================
@@ -249,28 +434,32 @@ def dashboard():
 @app.route("/users")
 @login_required
 def users():
+    with ThreadPoolExecutor(max_workers=2) as pool:
+        f_users  = pool.submit(db.get_all_users)
+        f_points = pool.submit(db.get_all_access_points)
+        all_users         = f_users.result()
+        all_access_points = f_points.result()
     return render_template(
         "users.html",
         active_page="users",
         operator_id=session.get("operator_id", "User"),
-        users=db.get_all_users(),
+        users=all_users,
+        access_points=all_access_points,
     )
 
 
 @app.route("/users/add", methods=["POST"])
 @login_required
 def add_user():
-    full_name = request.form.get("full_name", "").strip()
-    username  = request.form.get("username",  "").strip()
-    password  = request.form.get("password",  "").strip()
-    role      = request.form.get("role",      "Operator").strip()
-    status    = request.form.get("status",    "Active").strip()
-    email     = request.form.get("email",     "").strip()
-    phone     = request.form.get("phone",     "").strip()
+    full_name   = request.form.get("full_name",  "").strip()
+    username    = request.form.get("username",   "").strip()
+    role        = request.form.get("role",        "General").strip()
+    status      = request.form.get("status",     "Active").strip()
+    email       = request.form.get("email",       "").strip()
 
-    if not all([full_name, username, password]):
+    if not all([full_name, username, email]):
         return jsonify({"success": False,
-                        "error": "Full name, username and password are required."}), 400
+                        "error": "Full name, username and email are required."}), 400
 
     files = (
         [request.files.get("photo")]
@@ -280,8 +469,8 @@ def add_user():
     s3_keys     = _upload_photos_to_s3(files, username)
     primary_key = s3_keys[0] if s3_keys else None
 
-    ok, err = db.create_user(full_name, username, password, role, status,
-                             email, phone, primary_key, s3_keys)
+    ok, err = db.create_user(full_name, username, role, status,
+                             email, primary_key, s3_keys)
     if not ok:
         return jsonify({"success": False, "error": err}), 409
 
@@ -293,11 +482,10 @@ def add_user():
 @app.route("/users/<user_id>/edit", methods=["POST"])
 @login_required
 def edit_user(user_id):
-    full_name = request.form.get("full_name", "").strip()
-    role      = request.form.get("role",      "Operator").strip()
-    status    = request.form.get("status",    "Active").strip()
-    email     = request.form.get("email",     "").strip()
-    phone     = request.form.get("phone",     "").strip()
+    full_name = request.form.get("full_name",  "").strip()
+    role      = request.form.get("role",        "General").strip()
+    status    = request.form.get("status",     "Active").strip()
+    email     = request.form.get("email",       "").strip()
 
     if not full_name:
         return jsonify({"success": False, "error": "Full name is required."}), 400
@@ -306,33 +494,67 @@ def edit_user(user_id):
     if not existing:
         return jsonify({"success": False, "error": "User not found."}), 404
 
-    db.update_user(user_id, full_name, role, status, email, phone)
+    db.update_user(user_id, full_name, role, status, email)
 
-    # Re-upload photos only when new files are submitted
+    # ── Surgical photo management ────────────────────────────────────────────
+    # deleted_keys: S3 keys the admin explicitly removed in the edit modal
+    # kept_keys   : S3 keys the admin kept (not removed)
+    # samples     : new files/webcam frames to upload
+    deleted_keys = request.form.getlist("deleted_keys")
+    kept_keys    = request.form.getlist("kept_keys")
+
+    # Delete only the photos the admin removed
+    photos_changed = False
+    for key in deleted_keys:
+        if key:
+            aws_s3.delete_photo(key)
+            photos_changed = True
+
+    # Upload any new photos
     main_file    = request.files.get("photo")
     sample_files = request.files.getlist("samples") + request.files.getlist("samples[]")
     new_files    = [main_file] + sample_files
     has_new      = any(f and f.filename for f in new_files)
 
+    new_keys: list[str] = []
     if has_new:
-        # Delete old S3 photos first
-        for old_key in (existing.get("photos") or []):
-            aws_s3.delete_photo(old_key)
-        if not existing.get("photos") and existing.get("photo_path"):
-            aws_s3.delete_photo(existing["photo_path"])
+        username = existing.get("username", "unknown")
+        new_keys = _upload_photos_to_s3(new_files, username)
+        photos_changed = True
 
-        username    = existing.get("username", "unknown")
-        s3_keys     = _upload_photos_to_s3(new_files, username)
-        primary_key = s3_keys[0] if s3_keys else None
+    if photos_changed or kept_keys or new_keys:
+        # Merge kept existing photos with any newly uploaded ones
+        final_keys  = [k for k in kept_keys if k] + new_keys
+        primary_key = final_keys[0] if final_keys else None
         db.update_user_photo(user_id, primary_key)
-        db.update_user_photos(user_id, s3_keys)
+        db.update_user_photos(user_id, final_keys if final_keys else None)
 
         # Invalidate cached face encodings so next auth uses fresh photos
-        frs.clear_cache(user_id)
+        if photos_changed:
+            frs.clear_cache(user_id)
 
     db.add_log("User Updated", session.get("operator_id"), "Users", "Success",
                f"User ID {user_id} updated by {session.get('operator_id')}")
     return jsonify({"success": True})
+
+
+@app.route("/users/<user_id>/photos", methods=["GET"])
+@login_required
+def get_user_photos(user_id):
+    """
+    Return all enrolled S3 photo keys for a user.
+    Used by the Edit User modal to reliably load all photos even for users
+    created before multi-photo support was added (where data-photos may be stale).
+    """
+    user = db.get_user_by_id(user_id)
+    if not user:
+        return jsonify({"success": False, "error": "User not found."}), 404
+
+    photos = user.get("photos") or []
+    if not photos and user.get("photo_path"):
+        photos = [user["photo_path"]]
+
+    return jsonify({"success": True, "photos": photos})
 
 
 @app.route("/users/<user_id>/delete", methods=["POST"])
@@ -472,46 +694,306 @@ def authentication_recognize():
         user_id     = user_id,
         photo_path  = user.get("photo_path"),
         photo_paths = user.get("photos"),
-        tolerance   = 0.55,
+        tolerance   = FACE_TOLERANCE,
     )
 
-    # Fire the post-auth Lambda trigger (fire-and-forget, never blocks)
+    if result["match"]:
+        # Step 2 Face Recognized! Send HTML Push Approval Email with Clickable Button
+        recipient_email = user.get("email", "")
+        # Generate unique token for this specific authentication attempt
+        auth_token = uuid.uuid4().hex[:12]
+
+        push_ok, push_msg, masked_email = push_auth_service.send_push_approval_email(
+            recipient_email = recipient_email,
+            recipient_name  = user.get("full_name") or user.get("username") or "User",
+            access_point    = access_point,
+            user_id         = str(user_id),
+            token           = auth_token,
+        )
+
+        db.add_log(
+            "Push Auth Sent",
+            user["username"],
+            access_point,
+            "Success" if push_ok else "Warning",
+            f"Face recognized ({result['confidence']}%). {push_msg}",
+        )
+
+        # Trigger post-auth Lambda notification (match=False so door does not open before email approval)
+        aws_lambda_client.trigger_post_auth(
+            user_id      = str(user_id),
+            username     = user["username"],
+            full_name    = user["full_name"],
+            match        = False,
+            confidence   = result["confidence"],
+            access_point = access_point,
+            event_type   = "Push Auth Sent",
+        )
+
+        return jsonify({
+            "success":       True,
+            "match":         True,
+            "push_sent":     push_ok,
+            "user_id":       str(user_id),
+            "username":      user["username"],
+            "full_name":     user["full_name"],
+            "token":         auth_token,
+            "masked_email":  masked_email,
+            "message":       "Approval email sent. Waiting for user to click link...",
+            "cooldown":      30,
+            "confidence":    result["confidence"],
+            "face_count":    result["face_count"],
+            "distance":      result.get("distance"),
+            "error":         None,
+        })
+
+    # Facial scan failed / no match
     aws_lambda_client.trigger_post_auth(
         user_id      = str(user_id),
         username     = user["username"],
         full_name    = user["full_name"],
-        match        = result["match"],
+        match        = False,
         confidence   = result["confidence"],
         access_point = access_point,
-        event_type   = "Access Granted" if result["match"] else "Access Denied",
+        event_type   = "Access Denied",
     )
 
-    # Write the audit log
     log_details = (
-        f"match={result['match']}, confidence={result['confidence']}%, "
+        f"match=False, confidence={result['confidence']}%, "
         f"distance={result.get('distance', 'N/A')}, faces={result['face_count']}"
     )
     if result.get("error"):
         log_details += f"; error={result['error']}"
 
     db.add_log(
-        "Access Granted" if result["match"] else "Access Denied",
+        "Access Denied",
         user["username"],
         access_point,
-        "Success" if result["match"] else "Failed",
+        "Failed",
         log_details,
     )
 
     return jsonify({
         "success":    True,
-        "match":      result["match"],
+        "match":      False,
         "confidence": result["confidence"],
         "face_count": result["face_count"],
         "distance":   result.get("distance"),
         "username":   user["username"],
         "full_name":  user["full_name"],
-        "error":      result.get("error"),
+        "error":      result.get("error") or "Face not recognized.",
     })
+
+
+@app.route("/authentication/resend-push", methods=["POST"])
+@login_required
+def authentication_resend_push():
+    """Resend the HTML approval email with the clickable button."""
+    data = request.get_json(silent=True) or {}
+    user_id = data.get("user_id")
+    access_point = data.get("access_point", "Server Room")
+
+    if not user_id:
+        return jsonify({"success": False, "error": "user_id is required"}), 400
+
+    user = db.get_user_by_id(user_id)
+    if not user:
+        return jsonify({"success": False, "error": "User not found"}), 404
+
+    token = data.get("token") or uuid.uuid4().hex[:12]
+
+    push_ok, push_msg, masked_email = push_auth_service.send_push_approval_email(
+        recipient_email = user.get("email", ""),
+        recipient_name  = user.get("full_name") or user.get("username") or "User",
+        access_point    = access_point,
+        user_id         = str(user_id),
+        token           = token,
+    )
+
+    return jsonify({
+        "success":      push_ok,
+        "message":      push_msg,
+        "masked_email": masked_email,
+        "token":        token,
+    })
+
+
+@app.route("/auth/approve/<user_id>")
+def auth_approve_endpoint(user_id):
+    """
+    Handle the 'Approve & Unlock Door' button click from the email.
+    Publishes JSON {"status": "GRANTED", "name": "<name>"} to AWS IoT Core
+    to unlock the physical ESP32 door lock for 5 seconds.
+    """
+    user = db.get_user_by_id(user_id)
+    if not user:
+        return """<!DOCTYPE html><html><body style="background:#0b0f19;color:#ef4444;font-family:sans-serif;text-align:center;padding:50px">
+        <h2>⚠️ User Not Found or Session Expired</h2></body></html>""", 404
+
+    full_name = user.get("full_name") or user.get("username") or "User"
+
+    # ── UNLOCK PHYSICAL DOOR VIA AWS IOT CORE ──────────────────────────────────
+    door_fired = trigger_door_unlock(user_id, full_name=full_name)
+    if door_fired:
+        logger.info("ESP32 door unlocked via email button approval for '%s'", full_name)
+
+    # Secondary audit log
+    db.add_log(
+        "Access Granted",
+        user["username"],
+        "Email Push Button",
+        "Success",
+        f"Physical door unlocked via email button approval by '{full_name}'",
+    )
+
+    # Post-auth Lambda
+    aws_lambda_client.trigger_post_auth(
+        user_id      = str(user_id),
+        username     = user["username"],
+        full_name    = full_name,
+        match        = True,
+        confidence   = 100.0,
+        access_point = "Email Push Button",
+        event_type   = "Access Granted",
+    )
+
+    # Record the approval so the auth page can detect it via polling (if local route used)
+    _approval_events[str(user_id)] = {
+        'granted_at': datetime.now(timezone.utc).isoformat(),
+        'full_name':  full_name,
+        'username':   user.get('username', ''),
+        'token':      request.args.get('token', '').strip(),
+    }
+
+    return f"""<!DOCTYPE html>
+<html>
+<head>
+  <meta charset="utf-8">
+  <meta name="viewport" content="width=device-width, initial-scale=1.0">
+  <title>Door Access Granted — FaceAuth</title>
+  <style>
+    body {{
+      margin: 0; padding: 0; background: #0b0f19; color: #f8fafc;
+      font-family: -apple-system, BlinkMacSystemFont, 'Segoe UI', Roboto, Helvetica, Arial, sans-serif;
+      display: flex; align-items: center; justify-content: center; min-height: 100vh;
+    }}
+    .card {{
+      background: #131b2e; border: 1px solid #2a3859; border-radius: 20px;
+      padding: 40px 30px; max-width: 440px; text-align: center;
+      box-shadow: 0 20px 40px rgba(0,0,0,0.6);
+    }}
+    .icon {{ font-size: 54px; margin-bottom: 12px; }}
+    h1 {{ margin: 0 0 10px; font-size: 24px; color: #10b981; }}
+    p {{ color: #94a3b8; font-size: 15px; line-height: 1.6; margin: 0 0 24px; }}
+    .badge {{
+      display: inline-block; background: rgba(16, 185, 129, 0.12);
+      color: #10b981; border: 1px solid rgba(16, 185, 129, 0.35);
+      padding: 8px 20px; border-radius: 999px; font-weight: 600; font-size: 14px;
+    }}
+  </style>
+</head>
+<body>
+  <div class="card">
+    <div class="icon">🔓</div>
+    <h1>Access Approved!</h1>
+    <p>Identity verified for <strong>{full_name}</strong>. The physical door lock command has been sent to AWS IoT Core.</p>
+    <div class="badge">✓ ESP32 Door Unlocked (5s)</div>
+  </div>
+</body>
+</html>
+"""
+
+
+_consumed_log_ids: set = set()
+
+@app.route("/auth/approval-status/<user_id>", methods=["GET", "POST"])
+def auth_approval_status(user_id):
+    """
+    Polling endpoint: called by the authentication kiosk page every ~2 s
+    after sending an approval email to detect when the user clicks the link.
+
+    Checks:
+      1. In-memory `_approval_events` (if local /auth/approve/<user_id> was triggered)
+      2. DynamoDB `faceauth-logs` table (written by AWS Lambda `FaceAuth-email-unlock`
+         when the user taps the button in the email on their phone / PC)
+    """
+    uid_str = str(user_id)
+    req_token = (request.args.get("token") or "").strip()
+    user = db.get_user_by_id(user_id)
+    user_fullname = (user.get("full_name") or "") if user else ""
+    user_username = (user.get("username") or "") if user else ""
+
+    # 1. Check in-memory store
+    event = _approval_events.get(uid_str)
+    if event:
+        # If token was supplied, ensure it matches
+        ev_token = event.get("token")
+        if not req_token or not ev_token or req_token == ev_token:
+            _approval_events.pop(uid_str, None)
+            return jsonify({
+                "approved": True,
+                "full_name": event.get("full_name") or user_fullname or "Authorized User",
+                "username": event.get("username") or user_username or "user",
+                "granted_at": event.get("granted_at", "")
+            })
+
+    # 2. Check DynamoDB faceauth-logs table for recent 'Access Granted' from 'Email Push Button'
+    try:
+        from boto3.dynamodb.conditions import Attr
+        from datetime import datetime, timezone, timedelta
+        from aws_config import get_dynamodb, DYNAMO_LOGS_TABLE
+
+        table = get_dynamodb().Table(DYNAMO_LOGS_TABLE)
+        # Look back up to 5 minutes
+        cutoff = (datetime.now(timezone.utc) - timedelta(minutes=5)).strftime("%Y-%m-%d %H:%M:%S")
+
+        filter_expr = (
+            Attr('access_point').eq('Email Push Button') &
+            Attr('event_type').eq('Access Granted') &
+            Attr('timestamp').gte(cutoff)
+        )
+
+        resp = table.scan(FilterExpression=filter_expr)
+        items = resp.get('Items', [])
+        while 'LastEvaluatedKey' in resp:
+            resp = table.scan(ExclusiveStartKey=resp['LastEvaluatedKey'], FilterExpression=filter_expr)
+            items.extend(resp.get('Items', []))
+
+        # Sort newest first
+        items.sort(key=lambda x: x.get('timestamp', ''), reverse=True)
+
+        for item in items:
+            log_id = item.get('log_id') or item.get('id')
+            if log_id in _consumed_log_ids:
+                continue
+
+            details = str(item.get('details', ''))
+            item_user = str(item.get('username', ''))
+            matched = False
+
+            # Strict matching: if token was generated for this session, it MUST match the token in details
+            if req_token:
+                if f"token={req_token}" in details:
+                    matched = True
+            else:
+                # Fallback only when no token was specified (legacy)
+                if f"user_id={uid_str}" in details:
+                    matched = True
+
+            if matched:
+                if log_id:
+                    _consumed_log_ids.add(log_id)
+                return jsonify({
+                    "approved": True,
+                    "full_name": item_user or user_fullname or "Authorized User",
+                    "username": user_username or item_user,
+                    "granted_at": item.get('timestamp', '')
+                })
+    except Exception as exc:
+        logger.warning("Error checking DynamoDB for approval status: %s", exc)
+
+    return jsonify({"approved": False})
+
 
 
 # ===========================================================================
@@ -730,11 +1212,188 @@ def logs():
 @app.route("/settings")
 @login_required
 def settings():
+    username = session.get("operator_id", "admin")
+    admin    = db.get_user_by_username(username) or {}
+
+    system_info = {
+        "python_version":  platform.python_version(),
+        "platform":        platform.system() + " " + platform.release(),
+        "flask_env":       os.environ.get("FLASK_ENV", "development"),
+        "aws_region":      os.environ.get("AWS_REGION", "us-east-1"),
+        "s3_bucket":       os.environ.get("S3_BUCKET_NAME", "—"),
+        "dynamo_users":    os.environ.get("DYNAMO_USERS_TABLE", "—"),
+        "dynamo_logs":     os.environ.get("DYNAMO_LOGS_TABLE", "—"),
+        "dynamo_points":   os.environ.get("DYNAMO_POINTS_TABLE", "—"),
+        "iot_endpoint":    os.environ.get("IOT_ENDPOINT", "Not configured") or "Not configured",
+        "face_lib":        "Available" if frs.is_available() else "Not installed",
+        "bleak_available": bt.BLEAK_AVAILABLE,
+    }
+
     return render_template(
         "settings.html",
         active_page="settings",
-        operator_id=session.get("operator_id", "User"),
+        operator_id=username,
+        admin=admin,
+        bt_rssi=BT_RSSI_THRESHOLD,
+        bt_scan=BT_SCAN_DURATION,
+        face_tolerance=FACE_TOLERANCE,
+        system_info=system_info,
     )
+
+
+@app.route("/settings/update-thresholds", methods=["POST"])
+@login_required
+def settings_update_thresholds():
+    """Update runtime thresholds for BT proximity and face recognition."""
+    global BT_RSSI_THRESHOLD, BT_SCAN_DURATION, FACE_TOLERANCE
+
+    data = request.get_json(silent=True) or {}
+
+    try:
+        if "bt_rssi" in data:
+            BT_RSSI_THRESHOLD = int(data["bt_rssi"])
+        if "bt_scan" in data:
+            BT_SCAN_DURATION = float(data["bt_scan"])
+        if "face_tolerance" in data:
+            val = float(data["face_tolerance"])
+            if not (0.3 <= val <= 0.9):
+                return jsonify({"success": False, "error": "Face tolerance must be between 0.3 and 0.9"}), 400
+            FACE_TOLERANCE = val
+    except (ValueError, TypeError) as exc:
+        return jsonify({"success": False, "error": str(exc)}), 400
+
+    db.add_log("System Update", session.get("operator_id"), "Settings", "Success",
+               f"Thresholds updated: RSSI={BT_RSSI_THRESHOLD}, Scan={BT_SCAN_DURATION}s, FaceTol={FACE_TOLERANCE}")
+    return jsonify({
+        "success":        True,
+        "bt_rssi":        BT_RSSI_THRESHOLD,
+        "bt_scan":        BT_SCAN_DURATION,
+        "face_tolerance": FACE_TOLERANCE,
+    })
+
+
+@app.route("/settings/change-password", methods=["POST"])
+@login_required
+def settings_change_password():
+    """Securely change the admin's own password."""
+    from werkzeug.security import generate_password_hash, check_password_hash
+
+    data         = request.get_json(silent=True) or {}
+    current_pw   = data.get("current_password", "").strip()
+    new_pw       = data.get("new_password",     "").strip()
+    confirm_pw   = data.get("confirm_password", "").strip()
+
+    if not all([current_pw, new_pw, confirm_pw]):
+        return jsonify({"success": False, "error": "All password fields are required."}), 400
+    if new_pw != confirm_pw:
+        return jsonify({"success": False, "error": "New passwords do not match."}), 400
+    if len(new_pw) < 8:
+        return jsonify({"success": False, "error": "Password must be at least 8 characters."}), 400
+
+    username = session.get("operator_id") or "admin"
+    user_id  = session.get("user_id")
+    user     = (user_id and db.get_user_by_id(user_id)) or (username and db.get_user_by_username(username))
+    if not user:
+        return jsonify({"success": False, "error": "User not found."}), 404
+
+    if not check_password_hash(user["password"], current_pw):
+        return jsonify({"success": False, "error": "Current password is incorrect."}), 403
+
+    new_hash = generate_password_hash(new_pw)
+    # Update password field in DynamoDB
+    from aws_config import get_dynamodb, DYNAMO_USERS_TABLE
+    table = get_dynamodb().Table(DYNAMO_USERS_TABLE)
+    uid = str(user.get("user_id") or user.get("id"))
+    table.update_item(
+        Key={"user_id": uid},
+        UpdateExpression="SET #pw = :pw, updated_at = :ua",
+        ExpressionAttributeNames={"#pw": "password"},
+        ExpressionAttributeValues={
+            ":pw": new_hash,
+            ":ua": datetime.now(timezone.utc).strftime("%Y-%m-%d %H:%M:%S"),
+        },
+    )
+    db.clear_users_cache()
+    db.add_log("Password Changed", username, "Settings", "Success",
+               f"Admin '{username}' changed their password")
+    return jsonify({"success": True, "message": "Password updated successfully."})
+
+
+@app.route("/settings/update-profile", methods=["POST"])
+@login_required
+def settings_update_profile():
+    """Update the admin's own full_name, email, and phone in DynamoDB."""
+    data      = request.get_json(silent=True) or {}
+    full_name = data.get("full_name", "").strip()
+    email     = data.get("email",     "").strip()
+    phone     = data.get("phone",     "").strip()
+
+    if not full_name:
+        return jsonify({"success": False, "error": "Full name is required."}), 400
+
+    username = session.get("operator_id") or "admin"
+    user_id  = session.get("user_id")
+    user     = (user_id and db.get_user_by_id(user_id)) or (username and db.get_user_by_username(username))
+    if not user:
+        return jsonify({"success": False, "error": "User not found."}), 404
+
+    from aws_config import get_dynamodb, DYNAMO_USERS_TABLE
+    table = get_dynamodb().Table(DYNAMO_USERS_TABLE)
+    uid   = str(user.get("user_id") or user.get("id"))
+    table.update_item(
+        Key={"user_id": uid},
+        UpdateExpression="SET full_name = :fn, email = :em, phone = :ph, updated_at = :ua",
+        ExpressionAttributeValues={
+            ":fn": full_name,
+            ":em": email,
+            ":ph": phone,
+            ":ua": datetime.now(timezone.utc).strftime("%Y-%m-%d %H:%M:%S"),
+        },
+    )
+    db.clear_users_cache()
+    db.add_log("Profile Updated", username, "Settings", "Success",
+               f"Admin '{username}' updated their profile")
+    return jsonify({"success": True, "message": "Profile updated successfully."})
+
+
+@app.route("/settings/export-logs")
+@login_required
+def settings_export_logs():
+    """Download all audit logs as a CSV file."""
+    logs   = db.get_logs(limit=500)
+    output = _io.StringIO()
+    writer = csv.writer(output)
+    writer.writerow(["Timestamp", "Event Type", "Username", "Access Point", "Status", "Details"])
+    for row in logs:
+        writer.writerow([
+            row.get("timestamp", ""),
+            row.get("event_type", ""),
+            row.get("username", ""),
+            row.get("access_point", ""),
+            row.get("status", ""),
+            row.get("details", ""),
+        ])
+    csv_data = output.getvalue()
+    filename = f"faceauth_audit_{datetime.now().strftime('%Y%m%d_%H%M%S')}.csv"
+    return Response(
+        csv_data,
+        mimetype="text/csv",
+        headers={"Content-Disposition": f"attachment; filename={filename}"},
+    )
+
+
+@app.route("/api/settings/status")
+@login_required
+def api_settings_status():
+    """Return live runtime values for settings page polling."""
+    return jsonify({
+        "success":        True,
+        "bt_rssi":        BT_RSSI_THRESHOLD,
+        "bt_scan":        BT_SCAN_DURATION,
+        "face_tolerance": FACE_TOLERANCE,
+        "face_lib":       frs.is_available(),
+        "bleak_available": bt.BLEAK_AVAILABLE,
+    })
 
 
 # ===========================================================================
@@ -748,14 +1407,24 @@ def uploaded_file(filename):
     Serve enrolled photos.
     In AWS mode the filename is an S3 key (e.g. 'users/bob/photos/x.jpg').
     Falls back to the local uploads folder for development.
+    Photos are served with a 7-day browser cache to avoid repeated S3 round-trips.
     """
+    cache_headers = {
+        "Cache-Control": "private, max-age=604800",   # 7 days
+    }
     if os.environ.get("AWS_ACCESS_KEY_ID"):
         try:
             photo_bytes, content_type = aws_s3.get_photo_bytes(filename)
-            return Response(photo_bytes, mimetype=content_type)
+            resp = Response(photo_bytes, mimetype=content_type)
+            for k, v in cache_headers.items():
+                resp.headers[k] = v
+            return resp
         except Exception:
             pass  # fall through to local disk
-    return send_from_directory(app.config["UPLOAD_FOLDER"], os.path.basename(filename))
+    resp = send_from_directory(app.config["UPLOAD_FOLDER"], os.path.basename(filename))
+    for k, v in cache_headers.items():
+        resp.headers[k] = v
+    return resp
 
 
 # ===========================================================================

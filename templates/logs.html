@@ -46,7 +46,7 @@
       <div class="table-row">
         <div class="col-time">{{ log.timestamp }}</div>
         <div class="col-event">
-          {% set et = log.event_type %}
+          {% set et = (log.event_type or '').replace('[Lambda] ', '').strip() %}
           {% if et == 'Access Granted' %}
             <span class="event-badge badge-success">{{ et }}</span>
           {% elif et == 'Access Denied' %}

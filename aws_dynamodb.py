@@ -16,11 +16,12 @@ faceauth-access-points : physical / logical access points
 
 import uuid
 import logging
+import threading
+import time
 from datetime import datetime, timezone
 from decimal import Decimal
 
 from boto3.dynamodb.conditions import Key, Attr
-from werkzeug.security import generate_password_hash  # type: ignore[import-untyped]
 
 from aws_config import (
     get_dynamodb,
@@ -30,6 +31,59 @@ from aws_config import (
 )
 
 logger = logging.getLogger(__name__)
+
+
+# ---------------------------------------------------------------------------
+# Simple TTL in-memory cache
+# ---------------------------------------------------------------------------
+
+class _TTLCache:
+    """
+    Thread-safe key→value store with per-entry expiry.
+
+    Usage:
+        cache = _TTLCache(ttl=30)
+        cache.set('key', value)
+        hit, value = cache.get('key')   # hit=False when missing or expired
+        cache.invalidate('key')         # evict a single key
+        cache.clear()                   # evict everything
+    """
+    def __init__(self, ttl: float = 30.0):
+        self._ttl   = ttl
+        self._store: dict = {}          # key → (value, expiry_timestamp)
+        self._lock  = threading.Lock()
+
+    def get(self, key):
+        with self._lock:
+            entry = self._store.get(key)
+            if entry is None:
+                return False, None
+            value, expiry = entry
+            if time.monotonic() > expiry:
+                del self._store[key]
+                return False, None
+            return True, value
+
+    def set(self, key, value):
+        with self._lock:
+            self._store[key] = (value, time.monotonic() + self._ttl)
+
+    def invalidate(self, key):
+        with self._lock:
+            self._store.pop(key, None)
+
+    def clear(self):
+        with self._lock:
+            self._store.clear()
+
+
+# Module-level cache instances (shared across all requests)
+_stats_cache        = _TTLCache(ttl=60)    # dashboard count stats (granted/denied/users/points)
+_users_cache        = _TTLCache(ttl=30)    # full user list
+_access_points_cache = _TTLCache(ttl=60)   # access points list
+_chart_cache        = _TTLCache(ttl=120)   # 7-day chart data (expensive full scan)
+_breakdown_cache    = _TTLCache(ttl=120)   # event-type breakdown (expensive full scan)
+_recent_logs_cache  = _TTLCache(ttl=15)    # recent logs for dashboard / notifications
 
 
 # ── Internal Helpers ──────────────────────────────────────────────────────────
@@ -149,22 +203,20 @@ def _seed_demo_data(dynamodb):
     logger.info("Seeding demo users and access points into DynamoDB …")
 
     demo_users = [
-        ('John Doe',        'admin',   'admin123',   'Administrator', 'admin@faceauth.io',   '+601112345678'),
-        ('Sarah Smith',     'sarah',   'sarah123',   'Operator',      'sarah@faceauth.io',   '+601122345678'),
-        ('Michael Johnson', 'michael', 'michael123', 'Viewer',        'michael@faceauth.io', '+601132345678'),
-        ('Emily Williams',  'emily',   'emily123',   'Operator',      'emily@faceauth.io',   '+601142345678'),
+        ('John Doe',        'admin',   'Administrator', 'admin@faceauth.io'),
+        ('Sarah Smith',     'sarah',   'Operator',      'sarah@faceauth.io'),
+        ('Michael Johnson', 'michael', 'Viewer',        'michael@faceauth.io'),
+        ('Emily Williams',  'emily',   'Operator',      'emily@faceauth.io'),
     ]
     with users_table.batch_writer() as batch:
-        for (full_name, username, password, role, email, phone) in demo_users:
+        for (full_name, username, role, email) in demo_users:
             batch.put_item(Item={
                 'user_id':    _new_id(),
                 'full_name':  full_name,
                 'username':   username,
-                'password':   generate_password_hash(password),
                 'role':       role,
                 'status':     'Active',
                 'email':      email,
-                'phone':      phone,
                 'created_at': _now(),
                 'updated_at': _now(),
             })
@@ -219,9 +271,18 @@ def _seed_demo_data(dynamodb):
 # ── User Queries ──────────────────────────────────────────────────────────────
 
 def get_all_users() -> list:
-    table = get_dynamodb().Table(DYNAMO_USERS_TABLE)
-    items = _scan_all(table)
-    return _rows(sorted(items, key=lambda x: x.get('created_at', '')))
+    hit, cached = _users_cache.get('all_users')
+    if hit:
+        return cached
+    table  = get_dynamodb().Table(DYNAMO_USERS_TABLE)
+    items  = _scan_all(table)
+    result = _rows(sorted(items, key=lambda x: x.get('created_at', '')))
+    _users_cache.set('all_users', result)
+    return result
+
+
+def clear_users_cache():
+    _users_cache.clear()
 
 
 def get_user_by_id(user_id: str):
@@ -231,17 +292,28 @@ def get_user_by_id(user_id: str):
 
 
 def get_user_by_username(username: str):
-    table    = get_dynamodb().Table(DYNAMO_USERS_TABLE)
-    response = table.query(
-        IndexName='UsernameIndex',
-        KeyConditionExpression=Key('username').eq(username),
-    )
-    items = response.get('Items', [])
-    return _row(items[0]) if items else None
+    if not username:
+        return None
+    try:
+        table    = get_dynamodb().Table(DYNAMO_USERS_TABLE)
+        response = table.query(
+            IndexName='UsernameIndex',
+            KeyConditionExpression=Key('username').eq(username),
+        )
+        items = response.get('Items', [])
+        if items:
+            return _row(items[0])
+    except Exception as exc:
+        logger.warning("UsernameIndex query failed, falling back to scan: %s", exc)
+
+    for u in get_all_users():
+        if u.get('username') == username:
+            return u
+    return None
 
 
-def create_user(full_name, username, password_plain, role, status,
-                email, phone, photo_path=None, photos=None):
+def create_user(full_name, username, role, status,
+                email, photo_path=None, photos=None):
     """Create a new user.  Returns (True, None) or (False, error_message)."""
     if get_user_by_username(username):
         return False, "Username already exists."
@@ -251,7 +323,6 @@ def create_user(full_name, username, password_plain, role, status,
         'user_id':    _new_id(),
         'full_name':  full_name,
         'username':   username,
-        'password':   generate_password_hash(password_plain),
         'role':       role,
         'status':     status,
         'created_at': _now(),
@@ -259,19 +330,19 @@ def create_user(full_name, username, password_plain, role, status,
     }
     # Only store optional fields when they have a value
     if email:      item['email']      = email
-    if phone:      item['phone']      = phone
     if photo_path: item['photo_path'] = photo_path
     if photos:     item['photos']     = photos
 
     try:
         table.put_item(Item=item)
+        _users_cache.clear()           # invalidate cached user list
         return True, None
     except Exception as exc:
         logger.error("create_user DynamoDB error: %s", exc)
         return False, str(exc)
 
 
-def update_user(user_id, full_name, role, status, email, phone):
+def update_user(user_id, full_name, role, status, email):
     table = get_dynamodb().Table(DYNAMO_USERS_TABLE)
 
     # role and status are reserved-ish; use ExpressionAttributeNames
@@ -282,9 +353,6 @@ def update_user(user_id, full_name, role, status, email, phone):
     if email is not None:
         expr_parts.append('email = :email')
         expr_vals[':email'] = email
-    if phone is not None:
-        expr_parts.append('phone = :phone')
-        expr_vals[':phone'] = phone
 
     table.update_item(
         Key={'user_id': str(user_id)},
@@ -292,6 +360,7 @@ def update_user(user_id, full_name, role, status, email, phone):
         ExpressionAttributeValues=expr_vals,
         ExpressionAttributeNames=expr_names,
     )
+    _users_cache.clear()               # invalidate cached user list
 
 
 def update_user_photo(user_id, photo_path: str | None):
@@ -356,27 +425,52 @@ def get_user_bluetooth_mac(user_id: str) -> str | None:
 def delete_user(user_id):
     table = get_dynamodb().Table(DYNAMO_USERS_TABLE)
     table.delete_item(Key={'user_id': str(user_id)})
+    _users_cache.clear()               # invalidate cached user list
 
 
 def count_active_users() -> int:
+    hit, val = _stats_cache.get('active_users')
+    if hit:
+        return val
     table    = get_dynamodb().Table(DYNAMO_USERS_TABLE)
     response = table.scan(FilterExpression=Attr('status').eq('Active'), Select='COUNT')
-    return response.get('Count', 0)
+    result   = response.get('Count', 0)
+    _stats_cache.set('active_users', result)
+    return result
 
 
 # ── Log Queries ───────────────────────────────────────────────────────────────
 
 def add_log(event_type, username, access_point, status, details=""):
-    table = get_dynamodb().Table(DYNAMO_LOGS_TABLE)
-    table.put_item(Item={
-        'log_id':       _new_id(),
-        'timestamp':    _now(),
-        'event_type':   event_type   or '',
-        'username':     username     or 'unknown',
-        'access_point': access_point or '',
-        'status':       status       or '',
-        'details':      details      or '',
-    })
+    """
+    Write an audit-log entry to DynamoDB.
+
+    Fire-and-forget: the write runs in a daemon thread so the caller
+    (and the HTTP response) is never blocked by DynamoDB network latency.
+    Invalidates cached log/chart data so the next read reflects the new entry.
+    """
+    # Eagerly invalidate read caches so the new entry appears promptly
+    _recent_logs_cache.clear()
+    _chart_cache.clear()
+    _breakdown_cache.clear()
+    # stats cache is intentionally left to expire naturally (60 s)
+
+    def _write():
+        try:
+            table = get_dynamodb().Table(DYNAMO_LOGS_TABLE)
+            table.put_item(Item={
+                'log_id':       _new_id(),
+                'timestamp':    _now(),
+                'event_type':   event_type   or '',
+                'username':     username     or 'unknown',
+                'access_point': access_point or '',
+                'status':       status       or '',
+                'details':      details      or '',
+            })
+        except Exception as exc:
+            logger.warning("add_log background write failed: %s", exc)
+
+    threading.Thread(target=_write, daemon=True, name="log-write").start()
 
 
 def get_logs(event_type=None, date_from=None, date_to=None, limit=200) -> list:
@@ -407,32 +501,78 @@ def get_logs(event_type=None, date_from=None, date_to=None, limit=200) -> list:
     return _rows(items[:limit])
 
 
-def count_access_granted() -> int:
+def _fetch_access_counts() -> tuple[int, int]:
+    """
+    Internal helper: fetch Access Granted + Access Denied counts in a
+    *single* DynamoDB scan instead of two separate round-trips.
+
+    Results are written into _stats_cache under 'access_granted' and
+    'access_denied' so individual callers remain cache-aware.
+    """
     table    = get_dynamodb().Table(DYNAMO_LOGS_TABLE)
     response = table.scan(
-        FilterExpression=Attr('event_type').eq('Access Granted'), Select='COUNT'
+        FilterExpression=(
+            Attr('event_type').eq('Access Granted') |
+            Attr('event_type').eq('Access Denied')
+        ),
+        ProjectionExpression='event_type',
     )
-    return response.get('Count', 0)
+    items = response.get('Items', [])
+    while 'LastEvaluatedKey' in response:
+        response = table.scan(
+            ExclusiveStartKey=response['LastEvaluatedKey'],
+            FilterExpression=(
+                Attr('event_type').eq('Access Granted') |
+                Attr('event_type').eq('Access Denied')
+            ),
+            ProjectionExpression='event_type',
+        )
+        items.extend(response.get('Items', []))
+
+    granted = sum(1 for i in items if i.get('event_type') == 'Access Granted')
+    denied  = sum(1 for i in items if i.get('event_type') == 'Access Denied')
+    _stats_cache.set('access_granted', granted)
+    _stats_cache.set('access_denied',  denied)
+    return granted, denied
+
+
+def count_access_granted() -> int:
+    hit, val = _stats_cache.get('access_granted')
+    if hit:
+        return val
+    granted, _ = _fetch_access_counts()
+    return granted
 
 
 def count_access_denied() -> int:
-    table    = get_dynamodb().Table(DYNAMO_LOGS_TABLE)
-    response = table.scan(
-        FilterExpression=Attr('event_type').eq('Access Denied'), Select='COUNT'
-    )
-    return response.get('Count', 0)
+    hit, val = _stats_cache.get('access_denied')
+    if hit:
+        return val
+    _, denied = _fetch_access_counts()
+    return denied
 
 
 def get_recent_logs(limit=5) -> list:
-    return get_logs(limit=limit)
+    cache_key = f'recent_logs_{limit}'
+    hit, cached = _recent_logs_cache.get(cache_key)
+    if hit:
+        return cached
+    result = get_logs(limit=limit)
+    _recent_logs_cache.set(cache_key, result)
+    return result
 
 
 # ── Access Point Queries ──────────────────────────────────────────────────────
 
 def get_all_access_points() -> list:
-    table = get_dynamodb().Table(DYNAMO_POINTS_TABLE)
-    items = _scan_all(table)
-    return _rows(sorted(items, key=lambda x: x.get('created_at', '')))
+    hit, cached = _access_points_cache.get('all_access_points')
+    if hit:
+        return cached
+    table  = get_dynamodb().Table(DYNAMO_POINTS_TABLE)
+    items  = _scan_all(table)
+    result = _rows(sorted(items, key=lambda x: x.get('created_at', '')))
+    _access_points_cache.set('all_access_points', result)
+    return result
 
 
 def get_access_point_by_id(ap_id: str):
@@ -453,6 +593,8 @@ def create_access_point(name, location, ap_type, status):
         'success_rate':  _dec(100.0),
         'created_at':    _now(),
     })
+    _access_points_cache.clear()
+    _stats_cache.invalidate('active_points')
 
 
 def update_access_point(ap_id, name, location, ap_type, status):
@@ -467,14 +609,131 @@ def update_access_point(ap_id, name, location, ap_type, status):
             ':name': name, ':loc': location, ':type': ap_type, ':status': status,
         },
     )
+    _access_points_cache.clear()
+    _stats_cache.invalidate('active_points')
 
 
 def delete_access_point(ap_id):
     table = get_dynamodb().Table(DYNAMO_POINTS_TABLE)
     table.delete_item(Key={'point_id': str(ap_id)})
+    _access_points_cache.clear()
+    _stats_cache.invalidate('active_points')
 
 
 def count_active_access_points() -> int:
-    table    = get_dynamodb().Table(DYNAMO_POINTS_TABLE)
-    response = table.scan(FilterExpression=Attr('status').eq('Active'), Select='COUNT')
-    return response.get('Count', 0)
+    hit, val = _stats_cache.get('active_points')
+    if hit:
+        return val
+    # Reuse cached access points list if available — avoids extra scan
+    ap_hit, ap_list = _access_points_cache.get('all_access_points')
+    if ap_hit:
+        result = sum(1 for ap in ap_list if ap.get('status') == 'Active')
+    else:
+        table    = get_dynamodb().Table(DYNAMO_POINTS_TABLE)
+        response = table.scan(FilterExpression=Attr('status').eq('Active'), Select='COUNT')
+        result   = response.get('Count', 0)
+    _stats_cache.set('active_points', result)
+    return result
+
+
+def get_chart_data_7days() -> dict:
+    """
+    Return daily Access Granted / Access Denied counts for the last 7 days.
+    Used for the dashboard bar chart.
+    Results are cached for 120 s — chart data does not need to be real-time.
+
+    Returns:
+        {
+          "labels": ["Mon", "Tue", …],   # 7 day-name labels (oldest → newest)
+          "granted": [3, 1, 5, …],
+          "denied":  [0, 2, 1, …],
+        }
+    """
+    hit, cached = _chart_cache.get('chart_7days')
+    if hit:
+        return cached
+
+    from datetime import timedelta
+
+    today  = datetime.now(timezone.utc).date()
+    days   = [(today - timedelta(days=i)) for i in range(6, -1, -1)]  # oldest first
+    labels = [d.strftime('%a %d') for d in days]
+
+    granted_by_day: dict[str, int] = {d.strftime('%Y-%m-%d'): 0 for d in days}
+    denied_by_day:  dict[str, int] = {d.strftime('%Y-%m-%d'): 0 for d in days}
+
+    cutoff       = days[0].strftime('%Y-%m-%d')   # 6 days ago
+    filter_expr  = (
+        Attr('timestamp').gte(cutoff) &
+        (Attr('event_type').eq('Access Granted') | Attr('event_type').eq('Access Denied'))
+    )
+    table    = get_dynamodb().Table(DYNAMO_LOGS_TABLE)
+    response = table.scan(
+        FilterExpression=filter_expr,
+        ProjectionExpression='#ts, event_type',
+        ExpressionAttributeNames={'#ts': 'timestamp'},
+    )
+    items = response.get('Items', [])
+    while 'LastEvaluatedKey' in response:
+        response = table.scan(
+            ExclusiveStartKey=response['LastEvaluatedKey'],
+            FilterExpression=filter_expr,
+            ProjectionExpression='#ts, event_type',
+            ExpressionAttributeNames={'#ts': 'timestamp'},
+        )
+        items.extend(response.get('Items', []))
+
+    for item in items:
+        ts  = str(item.get('timestamp', ''))[:10]   # "YYYY-MM-DD"
+        evt = item.get('event_type', '')
+        if ts in granted_by_day:
+            if evt == 'Access Granted':
+                granted_by_day[ts] += 1
+            elif evt == 'Access Denied':
+                denied_by_day[ts]  += 1
+
+    result = {
+        'labels':  labels,
+        'granted': [granted_by_day[d.strftime('%Y-%m-%d')] for d in days],
+        'denied':  [denied_by_day[d.strftime('%Y-%m-%d')]  for d in days],
+    }
+    _chart_cache.set('chart_7days', result)
+    return result
+
+
+def get_event_type_breakdown() -> list:
+    """
+    Return a list of (event_type, count) for all log entries.
+    Used for the dashboard donut chart.
+    Results are cached for 120 s — breakdown data does not need to be real-time.
+
+    Returns:
+        [{"label": "Access Granted", "count": 42}, …]  sorted by count desc
+    """
+    hit, cached = _breakdown_cache.get('event_breakdown')
+    if hit:
+        return cached
+
+    table    = get_dynamodb().Table(DYNAMO_LOGS_TABLE)
+    response = table.scan(ProjectionExpression='event_type')
+    items    = response.get('Items', [])
+    while 'LastEvaluatedKey' in response:
+        response = table.scan(
+            ExclusiveStartKey=response['LastEvaluatedKey'],
+            ProjectionExpression='event_type',
+        )
+        items.extend(response.get('Items', []))
+
+    counts: dict[str, int] = {}
+    for item in items:
+        et = item.get('event_type', 'Unknown')
+        counts[et] = counts.get(et, 0) + 1
+
+    result = sorted(
+        [{'label': k, 'count': v} for k, v in counts.items()],
+        key=lambda x: x['count'],
+        reverse=True,
+    )
+    _breakdown_cache.set('event_breakdown', result)
+    return result
+

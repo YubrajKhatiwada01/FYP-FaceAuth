@@ -1,0 +1,92 @@
+﻿/* theme.css - Theme Toggle Button, Smooth Transitions, Logo Light/Dark Swap */
+
+/* ─── SMOOTH THEME TRANSITION ─────────────────────────────────────────────── */
+*,
+*::before,
+*::after {
+  transition:
+    background-color 0.3s ease,
+    border-color 0.3s ease,
+    color 0.3s ease,
+    box-shadow 0.3s ease;
+}
+
+/* ─── THEME TOGGLE BUTTON ─────────────────────────────────────────────────── */
+.theme-toggle {
+  display: inline-flex;
+  align-items: center;
+  justify-content: center;
+  width: 40px;
+  height: 40px;
+  border-radius: 50%;
+  border: 1.5px solid var(--line-strong);
+  background: var(--accent-subtle);
+  color: var(--accent);
+  cursor: pointer;
+  transition:
+    transform 0.3s cubic-bezier(0.34, 1.56, 0.64, 1),
+    background 0.3s ease,
+    border-color 0.3s ease,
+    box-shadow 0.3s ease !important;
+  position: relative;
+  overflow: hidden;
+  flex-shrink: 0;
+}
+
+.theme-toggle::before {
+  content: '';
+  position: absolute;
+  inset: 0;
+  border-radius: 50%;
+  background: radial-gradient(circle at center, var(--accent-glow), transparent 70%);
+  opacity: 0;
+  transition: opacity 0.3s ease !important;
+}
+
+.theme-toggle:hover {
+  transform: rotate(20deg) scale(1.1);
+  box-shadow: 0 0 18px var(--accent-glow);
+  border-color: var(--accent);
+}
+
+.theme-toggle:hover::before {
+  opacity: 1;
+}
+
+.theme-toggle svg {
+  width: 18px;
+  height: 18px;
+  position: relative;
+  z-index: 1;
+  transition: transform 0.4s cubic-bezier(0.34, 1.56, 0.64, 1) !important;
+}
+
+.theme-toggle:hover svg {
+  transform: rotate(15deg);
+}
+
+/* Show/hide icons based on current theme */
+.theme-toggle .icon-moon {
+  display: var(--theme-icon-moon);
+}
+
+.theme-toggle .icon-sun {
+  display: var(--theme-icon-sun);
+}
+
+
+/* ── Theme-specific logo visibility ─────────────────────────────────── */
+/* Dark mode (default): show dark logo, hide light logo */
+.logo-light { display: none; }
+.logo-dark  { display: block; }
+
+/* Light mode: show light logo, hide dark logo */
+[data-theme="light"] .logo-light { display: block; }
+[data-theme="light"] .logo-dark  { display: none; }
+
+/* Light mode: make dashboard sidebar logo a bit bigger */
+[data-theme="light"] .sidebar-brand .logo-light {
+  width: 115%;
+  height: 115%;
+  object-fit: contain;
+}

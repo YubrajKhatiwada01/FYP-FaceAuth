@@ -7,7 +7,8 @@
     <div class="sidebar-header">
       <a href="{{ url_for('dashboard') }}" class="sidebar-brand">
         <span class="brand-mark" aria-hidden="true">
-          <img src="{{ url_for('static', filename='images/final logo.png') }}" alt="FaceAuth Logo">
+          <img src="{{ url_for('static', filename='images/final logo.png') }}" alt="FaceAuth Logo" class="logo-dark">
+          <img src="{{ url_for('static', filename='images/final logo 2.png') }}" alt="FaceAuth Logo" class="logo-light">
         </span>
         <span>FaceAuth</span>
       </a>
@@ -104,19 +105,151 @@
       </div>
 
       <div class="header-actions">
-        <button class="header-btn" aria-label="Notifications">
-          <svg width="20" height="20" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2">
-            <path d="M18 8A6 6 0 0 0 6 8c0 7-3 9-3 9h18s-3-2-3-9"></path>
-            <path d="M13.73 21a2 2 0 0 1-3.46 0"></path>
+        <!-- Theme Toggle -->
+        <button class="theme-toggle" id="themeToggleBtn" type="button" aria-label="Toggle dark/light mode" title="Toggle dark/light mode">
+          <!-- Moon icon (shown in dark mode) -->
+          <svg class="icon-moon" xmlns="http://www.w3.org/2000/svg" width="18" height="18" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round">
+            <path d="M21 12.79A9 9 0 1 1 11.21 3 7 7 0 0 0 21 12.79z"/>
           </svg>
-          {% set count = self.dashboard_notifications_count()|trim %}
-          {% if count and count != '0' %}
-          <span class="notification-badge">{% block dashboard_notifications_count %}0{% endblock %}</span>
-          {% endif %}
+          <!-- Sun icon (shown in light mode) -->
+          <svg class="icon-sun" xmlns="http://www.w3.org/2000/svg" width="18" height="18" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round">
+            <circle cx="12" cy="12" r="5"/>
+            <line x1="12" y1="1" x2="12" y2="3"/>
+            <line x1="12" y1="21" x2="12" y2="23"/>
+            <line x1="4.22" y1="4.22" x2="5.64" y2="5.64"/>
+            <line x1="18.36" y1="18.36" x2="19.78" y2="19.78"/>
+            <line x1="1" y1="12" x2="3" y2="12"/>
+            <line x1="21" y1="12" x2="23" y2="12"/>
+            <line x1="4.22" y1="19.78" x2="5.64" y2="18.36"/>
+            <line x1="18.36" y1="5.64" x2="19.78" y2="4.22"/>
+          </svg>
         </button>
-        <button class="header-btn profile-btn" aria-label="Profile menu">
-          <div class="avatar">{{ operator_id|first if operator_id else 'U' }}</div>
-        </button>
+
+        <!-- Notification Dropdown Wrapper -->
+        <div class="header-dropdown-wrap">
+          <button class="header-btn notification-toggle" id="notificationBtn" aria-label="Notifications" aria-expanded="false" title="View Notifications">
+            <svg width="20" height="20" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2">
+              <path d="M18 8A6 6 0 0 0 6 8c0 7-3 9-3 9h18s-3-2-3-9"></path>
+              <path d="M13.73 21a2 2 0 0 1-3.46 0"></path>
+            </svg>
+            <span class="notification-badge" id="notificationBadge">3</span>
+            <span class="notification-ping" id="notificationPing"></span>
+          </button>
+
+          <!-- Modern Notification Popover -->
+          <div class="dropdown-panel notification-panel" id="notificationDropdown" aria-hidden="true">
+            <div class="dropdown-panel-header">
+              <div class="dropdown-title-group">
+                <h3>Notifications</h3>
+                <span class="unread-pill" id="notificationUnreadCount">0 new</span>
+              </div>
+              <button class="btn-text-action" id="clearNotificationsBtn" type="button">Clear All</button>
+            </div>
+            
+            <div class="notification-tabs">
+              <button class="notif-tab is-active" data-tab="all" type="button">All Events</button>
+              <button class="notif-tab" data-tab="user_activity" type="button">User Activity</button>
+              <button class="notif-tab" data-tab="access_log" type="button">Access Logs</button>
+            </div>
+
+            <div class="notification-list" id="notificationList">
+              <div class="notif-loading">
+                <span class="spinner"></span> Loading notifications...
+              </div>
+            </div>
+
+            <div class="dropdown-panel-footer">
+              <a href="{{ url_for('logs') }}" class="view-all-logs-link">
+                <span>View Full Audit Logs</span>
+                <svg width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2">
+                  <path d="M5 12h14M12 5l7 7-7 7"/>
+                </svg>
+              </a>
+            </div>
+          </div>
+        </div>
+
+        <!-- Profile Dropdown Wrapper -->
+        <div class="header-dropdown-wrap">
+          <button class="header-btn profile-btn" id="profileBtn" aria-label="Profile menu" aria-expanded="false" title="Admin Account Menu">
+            <div class="avatar" id="headerAvatar">{{ operator_id|first if operator_id else 'A' }}</div>
+            <span class="online-status-dot"></span>
+          </button>
+
+          <!-- Modern Profile Popover -->
+          <div class="dropdown-panel profile-panel" id="profileDropdown" aria-hidden="true">
+            <div class="profile-card-header">
+              <div class="profile-avatar-wrapper">
+                <div class="avatar-lg" id="menuAvatar">{{ operator_id|first if operator_id else 'A' }}</div>
+                <span class="status-indicator"></span>
+              </div>
+              <div class="profile-user-meta">
+                <h4 class="profile-name" id="menuAdminName">{{ operator_id|capitalize if operator_id else 'Admin' }}</h4>
+                <div class="profile-role-badge">
+                  <svg width="12" height="12" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2">
+                    <path d="M12 22s8-4 8-10V5l-8-3-8 3v7c0 6 8 10 8 10z"/>
+                  </svg>
+                  Super Administrator
+                </div>
+                <span class="profile-email" id="menuAdminEmail">admin@faceauth.sec</span>
+              </div>
+            </div>
+
+            <div class="dropdown-menu-list">
+              <button class="dropdown-item" id="openAdminProfileModalBtn" type="button">
+                <div class="menu-icon icon-cyan">
+                  <svg width="18" height="18" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2">
+                    <path d="M20 21v-2a4 4 0 0 0-4-4H8a4 4 0 0 0-4 4v2"></path>
+                    <circle cx="12" cy="7" r="4"></circle>
+                  </svg>
+                </div>
+                <div class="menu-text">
+                  <strong>Admin Account Profile</strong>
+                  <small>View system permissions & session details</small>
+                </div>
+              </button>
+
+              <a href="{{ url_for('settings') }}" class="dropdown-item">
+                <div class="menu-icon icon-purple">
+                  <svg width="18" height="18" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2">
+                    <circle cx="12" cy="12" r="3"></circle>
+                    <path d="M19.4 15a1.65 1.65 0 0 0 .33 1.82l.06.06a2 2 0 0 1 0 2.83 2 2 0 0 1-2.83 0l-.06-.06a1.65 1.65 0 0 0-1.82-.33 1.65 1.65 0 0 0-1 1.51V21a2 2 0 0 1-2 2 2 2 0 0 1-2-2v-.09A1.65 1.65 0 0 0 9 19.4a1.65 1.65 0 0 0-1.82.33l-.06.06a2 2 0 0 1-2.83 0 2 2 0 0 1 0-2.83l.06-.06a1.65 1.65 0 0 0 .33-1.82 1.65 1.65 0 0 0-1.51-1H3a2 2 0 0 1-2-2 2 2 0 0 1 2-2h.09A1.65 1.65 0 0 0 4.6 9a1.65 1.65 0 0 0-.33-1.82l-.06-.06a2 2 0 0 1 0-2.83 2 2 0 0 1 2.83 0l.06.06a1.65 1.65 0 0 0 1.82.33H9a1.65 1.65 0 0 0 1-1.51V3a2 2 0 0 1 2-2 2 2 0 0 1 2 2v.09a1.65 1.65 0 0 0 1 1.51 1.65 1.65 0 0 0 1.82-.33l.06-.06a2 2 0 0 1 2.83 0 2 2 0 0 1 0 2.83l-.06.06a1.65 1.65 0 0 0-.33 1.82V9a1.65 1.65 0 0 0 1.51 1H21a2 2 0 0 1 2 2 2 2 0 0 1-2 2h-.09a1.65 1.65 0 0 0-1.51 1z"/>
+                  </svg>
+                </div>
+                <div class="menu-text">
+                  <strong>System Settings</strong>
+                  <small>Configure security & hardware</small>
+                </div>
+              </a>
+
+              <a href="{{ url_for('logs') }}" class="dropdown-item">
+                <div class="menu-icon icon-blue">
+                  <svg width="18" height="18" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2">
+                    <path d="M14 2H6a2 2 0 0 0-2 2v16a2 2 0 0 0 2 2h12a2 2 0 0 0 2-2V8z"></path>
+                    <polyline points="14 2 14 8 20 8"></polyline>
+                    <line x1="16" y1="13" x2="8" y2="13"></line>
+                    <line x1="16" y1="17" x2="8" y2="17"></line>
+                  </svg>
+                </div>
+                <div class="menu-text">
+                  <strong>Audit Activity Logs</strong>
+                  <small>View complete access history</small>
+                </div>
+              </a>
+            </div>
+
+            <div class="dropdown-footer-action">
+              <a href="{{ url_for('logout') }}" class="dropdown-logout-btn">
+                <svg width="18" height="18" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2">
+                  <path d="M9 21H5a2 2 0 0 1-2-2V5a2 2 0 0 1 2-2h4"></path>
+                  <polyline points="16 17 21 12 16 7"></polyline>
+                  <line x1="21" y1="12" x2="9" y2="12"></line>
+                </svg>
+                <span>Log Out of Admin Portal</span>
+              </a>
+            </div>
+          </div>
+        </div>
       </div>
     </header>
 
@@ -129,4 +262,129 @@
 
 <!-- Overlay for sidebar on mobile -->
 <div class="sidebar-overlay" id="sidebarOverlay"></div>
+
+<!-- Admin Profile Modal -->
+<div class="modal admin-profile-modal" id="adminProfileModal">
+  <div class="modal-content glass-card">
+    <div class="modal-header">
+      <div class="modal-title-with-badge">
+        <h3>Administrator Profile</h3>
+        <span class="modal-badge-root">Root Admin</span>
+      </div>
+      <button class="modal-close" id="closeAdminProfileModal" type="button" aria-label="Close modal">&times;</button>
+    </div>
+    
+    <div class="modal-body">
+      <!-- Top Overview Banner -->
+      <div class="admin-profile-banner">
+        <div class="admin-profile-avatar-container">
+          <div class="admin-modal-avatar" id="modalAvatar">{{ operator_id|first if operator_id else 'A' }}</div>
+          <span class="pulse-indicator"></span>
+        </div>
+        <div class="admin-modal-details">
+          <h2 id="modalAdminFullName">{{ operator_id|capitalize if operator_id else 'System Admin' }}</h2>
+          <p class="admin-modal-role">System Operator & Security Lead</p>
+          <div class="admin-status-chips">
+            <span class="chip chip-success">🟢 Active Administrator</span>
+            <span class="chip chip-cyan">🛡️ 2FA Verified</span>
+            <span class="chip chip-purple">☁️ DynamoDB Connected</span>
+          </div>
+        </div>
+      </div>
+
+      <!-- Detail Cards Grid -->
+      <div class="admin-info-grid">
+        <div class="info-card">
+          <div class="info-card-header">
+            <svg width="18" height="18" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2">
+              <path d="M20 21v-2a4 4 0 0 0-4-4H8a4 4 0 0 0-4 4v2"></path>
+              <circle cx="12" cy="7" r="4"></circle>
+            </svg>
+            <span>Operator Identity</span>
+          </div>
+          <div class="info-card-body">
+            <div class="info-row">
+              <label>Operator ID / Username:</label>
+              <strong id="modalAdminUsername">{{ operator_id if operator_id else 'admin' }}</strong>
+            </div>
+            <div class="info-row">
+              <label>Email Address:</label>
+              <span id="modalAdminEmail">admin@faceauth.sec</span>
+            </div>
+            <div class="info-row">
+              <label>Contact Phone:</label>
+              <span id="modalAdminPhone">+60 11-1234 5678</span>
+            </div>
+          </div>
+        </div>
+
+        <div class="info-card">
+          <div class="info-card-header">
+            <svg width="18" height="18" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2">
+              <rect x="3" y="11" width="18" height="11" rx="2" ry="2"></rect>
+              <path d="M7 11V7a5 5 0 0 1 10 0v4"></path>
+            </svg>
+            <span>Access & Security Level</span>
+          </div>
+          <div class="info-card-body">
+            <div class="info-row">
+              <label>System Privilege:</label>
+              <span class="badge-accent">Tier-1 Root Privilege</span>
+            </div>
+            <div class="info-row">
+              <label>Permissions:</label>
+              <div class="permission-tags">
+                <span class="tag">User Management</span>
+                <span class="tag">Face Auth</span>
+                <span class="tag">Bluetooth 2FA</span>
+                <span class="tag">Access Control</span>
+                <span class="tag">Audit Logs</span>
+              </div>
+            </div>
+          </div>
+        </div>
+
+        <div class="info-card full-width">
+          <div class="info-card-header">
+            <svg width="18" height="18" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2">
+              <circle cx="12" cy="12" r="10"></circle>
+              <polyline points="12 6 12 12 16 14"></polyline>
+            </svg>
+            <span>Active Session Information</span>
+          </div>
+          <div class="info-card-body session-grid">
+            <div class="session-stat">
+              <label>Session Status</label>
+              <strong class="text-ok">Encrypted & Active</strong>
+            </div>
+            <div class="session-stat">
+              <label>Session ID</label>
+              <span class="mono-text" id="modalSessionId">SEC-8A91F-ACTIVE</span>
+            </div>
+            <div class="session-stat">
+              <label>Client IP</label>
+              <span class="mono-text" id="modalClientIp">127.0.0.1</span>
+            </div>
+            <div class="session-stat">
+              <label>AWS Backend</label>
+              <span class="text-cyan" id="modalDbSync">DynamoDB + S3 Sync</span>
+            </div>
+          </div>
+        </div>
+      </div>
+    </div>
+
+    <div class="modal-footer">
+      <a href="{{ url_for('settings') }}" class="btn btn-secondary">
+        <svg width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2">
+          <circle cx="12" cy="12" r="3"></circle>
+          <path d="M19.4 15a1.65 1.65 0 0 0 .33 1.82l.06.06a2 2 0 0 1 0 2.83 2 2 0 0 1-2.83 0l-.06-.06a1.65 1.65 0 0 0-1.82-.33 1.65 1.65 0 0 0-1 1.51V21a2 2 0 0 1-2 2 2 2 0 0 1-2-2v-.09A1.65 1.65 0 0 0 9 19.4a1.65 1.65 0 0 0-1.82.33l-.06.06a2 2 0 0 1-2.83 0 2 2 0 0 1 0-2.83l.06-.06a1.65 1.65 0 0 0 .33-1.82 1.65 1.65 0 0 0-1.51-1H3a2 2 0 0 1-2-2 2 2 0 0 1 2-2h.09A1.65 1.65 0 0 0 4.6 9a1.65 1.65 0 0 0-.33-1.82l-.06-.06a2 2 0 0 1 0-2.83 2 2 0 0 1 2.83 0l.06.06a1.65 1.65 0 0 0 1.82.33H9a1.65 1.65 0 0 0 1-1.51V3a2 2 0 0 1 2-2 2 2 0 0 1 2 2v.09a1.65 1.65 0 0 0 1 1.51 1.65 1.65 0 0 0 1.82-.33l.06-.06a2 2 0 0 1 2.83 0 2 2 0 0 1 0 2.83l-.06.06a1.65 1.65 0 0 0-.33 1.82V9a1.65 1.65 0 0 0 1.51 1H21a2 2 0 0 1 2 2 2 2 0 0 1-2 2h-.09a1.65 1.65 0 0 0-1.51 1z"/>
+        </svg>
+        System Settings
+      </a>
+      <button type="button" class="btn btn-primary" id="closeAdminProfileModalDoneBtn">Done</button>
+    </div>
+  </div>
+</div>
 {% endblock %}
+

@@ -24,7 +24,8 @@ S3_BUCKET_NAME       = os.environ.get('S3_BUCKET_NAME',      'faceauth-fyp')
 DYNAMO_USERS_TABLE   = os.environ.get('DYNAMO_USERS_TABLE',   'faceauth-users')
 DYNAMO_LOGS_TABLE    = os.environ.get('DYNAMO_LOGS_TABLE',    'faceauth-logs')
 DYNAMO_POINTS_TABLE  = os.environ.get('DYNAMO_POINTS_TABLE',  'faceauth-access-points')
-LAMBDA_FUNCTION_NAME = os.environ.get('LAMBDA_FUNCTION_NAME', 'faceauth-post-auth-trigger')
+LAMBDA_FUNCTION_NAME  = os.environ.get('LAMBDA_FUNCTION_NAME',  'faceauth-post-auth-trigger')
+IOT_ENDPOINT          = os.environ.get('IOT_ENDPOINT',          '')   # e.g. xxxx-ats.iot.ap-south-1.amazonaws.com
 
 
 import threading
@@ -67,3 +68,28 @@ def get_lambda():
     if not hasattr(_thread_local, 'lambda_client'):
         _thread_local.lambda_client = _session().client('lambda')
     return _thread_local.lambda_client
+
+
+def get_iot_data(region_name: str = 'ap-south-1'):
+    """
+    Return a thread-local AWS IoT Data Plane client.
+
+    The IoT Data endpoint is read from the IOT_ENDPOINT env var.  If it is
+    not set boto3 will fall back to the regional default endpoint, which is
+    fine for most use-cases.
+
+    Parameters
+    ----------
+    region_name : str
+        AWS region where your IoT Core broker lives.  Defaults to ap-south-1.
+    """
+    cache_attr = f'iot_data_{region_name}'
+    if not hasattr(_thread_local, cache_attr):
+        endpoint_url = IOT_ENDPOINT
+        client = _session().client(
+            'iot-data',
+            region_name  = region_name,
+            endpoint_url = f'https://{endpoint_url}' if endpoint_url else None,
+        )
+        setattr(_thread_local, cache_attr, client)
+    return getattr(_thread_local, cache_attr)

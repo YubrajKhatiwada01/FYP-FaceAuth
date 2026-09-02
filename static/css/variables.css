@@ -1,0 +1,56 @@
+﻿/* variables.css - CSS Custom Properties (Design Tokens)
+   Dark mode (default) + Light mode overrides */
+
+/* ─── DARK MODE (default) ─────────────────────────────────────────────────── */
+:root {
+  --bg: #0d0f10;
+  --bg-soft: #121516;
+  --panel: rgba(27, 29, 29, 0.88);
+  --panel-strong: #181a1b;
+  --line: rgba(191, 250, 255, 0.18);
+  --line-strong: rgba(191, 250, 255, 0.42);
+  --text: #f3f7f8;
+  --muted: #a5afb4;
+  --dim: #6f7c82;
+  --accent: #15d5ee;
+  --accent-soft: #baf7ff;
+  --accent-glow: rgba(21, 213, 238, 0.28);
+  --accent-subtle: rgba(21, 213, 238, 0.1);
+  --cyan: #15d5ee;
+  --cyan-soft: #baf7ff;
+  --blue: #1478f2;
+  --danger: #ffaaa3;
+  --ok: #39e88f;
+  --shadow: 0 22px 70px rgba(0, 0, 0, 0.42);
+  --mono: "JetBrains Mono", "Cascadia Mono", Consolas, monospace;
+  --sans: Inter, "Segoe UI", Arial, sans-serif;
+  /* Theme toggle icon states */
+  --theme-icon-moon: block;
+  --theme-icon-sun: none;
+}
+
+/* ─── LIGHT MODE ──────────────────────────────────────────────────────────── */
+html[data-theme="light"] {
+  --bg: #f8f5ff;
+  --bg-soft: #ffffff;
+  --panel: rgba(255, 255, 255, 0.92);
+  --panel-strong: #ffffff;
+  --line: rgba(129, 75, 238, 0.14);
+  --line-strong: rgba(129, 75, 238, 0.36);
+  --text: #1a1028;
+  --muted: #6b5c8a;
+  --dim: #9e8ebf;
+  --accent: #814BEE;
+  --accent-soft: #a67ff5;
+  --accent-glow: rgba(129, 75, 238, 0.28);
+  --accent-subtle: rgba(129, 75, 238, 0.08);
+  --cyan: #814BEE;
+  --cyan-soft: #814BEE;
+  --blue: #5b35d5;
+  --danger: #e63946;
+  --ok: #2dc653;
+  --shadow: 0 22px 70px rgba(129, 75, 238, 0.14);
+  /* Theme toggle icon states */
+  --theme-icon-moon: none;
+  --theme-icon-sun: block;
+}

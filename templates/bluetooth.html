@@ -196,12 +196,67 @@
 .bt-modal-backdrop.open { display:flex; }
 .bt-modal {
   background:#0f172a; border:1px solid rgba(37,99,235,.35);
-  border-radius:1.25rem; padding:2rem; width:420px; max-width:95vw;
+  border-radius:1.25rem; padding:2rem; width:460px; max-width:95vw;
   box-shadow: 0 25px 60px rgba(0,0,0,.5);
   animation: modalIn .25s ease;
 }
 @keyframes modalIn  { from{opacity:0;transform:translateY(-20px)} to{opacity:1;transform:none} }
 @keyframes fadeInUp { from{opacity:0;transform:translateY(8px)}   to{opacity:1;transform:none} }
+
+/* ── Nearby device picker ────────────────────────────────────────── */
+.bt-nearby-scan-btn {
+  width:100%; padding:.55rem 1rem; border-radius:.65rem;
+  background:rgba(6,182,212,.12); border:1px solid rgba(6,182,212,.35);
+  color:#06b6d4; font-size:.825rem; font-weight:600; cursor:pointer;
+  display:flex; align-items:center; justify-content:center; gap:.45rem;
+  transition:all .2s; margin-top:.5rem;
+}
+.bt-nearby-scan-btn:hover { background:rgba(6,182,212,.22); border-color:#06b6d4; color:#fff; }
+.bt-nearby-scan-btn:disabled { opacity:.5; cursor:not-allowed; }
+
+.bt-nearby-list {
+  margin-top:.85rem; border-radius:.75rem; overflow:hidden;
+  border:1px solid rgba(37,99,235,.25); display:none;
+}
+.bt-nearby-list-header {
+  padding:.45rem .9rem; background:rgba(37,99,235,.12);
+  font-size:.7rem; font-weight:700; text-transform:uppercase;
+  letter-spacing:.06em; color:#64748b;
+  display:flex; justify-content:space-between; align-items:center;
+}
+.bt-nearby-list-header .bt-nearby-count { color:#06b6d4; }
+.bt-nearby-item {
+  display:flex; align-items:center; gap:.7rem; padding:.6rem .9rem;
+  border-top:1px solid rgba(255,255,255,.05); cursor:pointer;
+  transition:background .15s;
+}
+.bt-nearby-item:first-child { border-top:none; }
+.bt-nearby-item:hover { background:rgba(37,99,235,.12); }
+.bt-nearby-item-icon {
+  width:30px; height:30px; border-radius:50%;
+  background:linear-gradient(135deg,#2563eb,#06b6d4);
+  display:flex; align-items:center; justify-content:center; flex-shrink:0;
+}
+.bt-nearby-item-info { flex:1; min-width:0; }
+.bt-nearby-item-name { font-size:.825rem; font-weight:600; color:#e2e8f0; white-space:nowrap; overflow:hidden; text-overflow:ellipsis; }
+.bt-nearby-item-mac  { font-size:.72rem; font-family:monospace; color:#64748b; margin-top:.1rem; }
+.bt-nearby-item-rssi {
+  font-size:.72rem; font-weight:700; padding:.2rem .5rem;
+  border-radius:9999px; white-space:nowrap; flex-shrink:0;
+}
+.bt-nearby-item-rssi.strong { background:rgba(16,185,129,.15); color:#10b981; }
+.bt-nearby-item-rssi.medium { background:rgba(245,158,11,.15);  color:#f59e0b; }
+.bt-nearby-item-rssi.weak   { background:rgba(239,68,68,.15);   color:#ef4444; }
+
+.bt-nearby-empty {
+  padding:1.25rem; text-align:center; font-size:.8rem; color:#475569;
+}
+.bt-nearby-scanning {
+  padding:.9rem; text-align:center; font-size:.8rem; color:#94a3b8;
+  display:flex; align-items:center; justify-content:center; gap:.5rem;
+}
+.bt-spin { animation:spin .9s linear infinite; display:inline-block; }
+@keyframes spin { to { transform:rotate(360deg); } }
 
 .bt-modal-title { font-size:1.1rem; font-weight:700; margin-bottom:1.25rem; display:flex; align-items:center; gap:.5rem; }
 .bt-modal-field { margin-bottom:1rem; }
@@ -228,7 +283,129 @@
 .bt-modal-actions .btn-save:hover { opacity:.85; }
 
 /* ── Scan-all progress ──────────────────────────────────────────── */
+/* ── Scan-all progress ──────────────────────────────────────────── */
 .scan-all-progress { display:none; padding:.75rem 1.5rem; border-top:1px solid var(--bt-border); font-size:.8rem; color:#94a3b8; }
+
+/* ════════════════════════════════════════════════════════════════════════
+   LIGHT MODE OVERRIDES — Bluetooth 2FA Page
+   All dark hardcoded values replaced with white/purple palette
+   ════════════════════════════════════════════════════════════════════════ */
+html[data-theme="light"] {
+  --bt-primary:  #814BEE;
+  --bt-accent:   #6c3dca;
+  --bt-glow:     rgba(129, 75, 238, 0.3);
+  --bt-card-bg:  rgba(255, 255, 255, 0.93);
+  --bt-border:   rgba(129, 75, 238, 0.18);
+}
+
+/* Hero scanner card */
+html[data-theme="light"] .bt-hero-card {
+  background: rgba(255, 255, 255, 0.95);
+  border-color: rgba(129, 75, 238, 0.18);
+  box-shadow: 0 8px 32px rgba(129, 75, 238, 0.1);
+}
+html[data-theme="light"] .bt-hero-card::before {
+  background: radial-gradient(ellipse at 50% 30%, rgba(129,75,238,0.08) 0%, transparent 70%);
+}
+html[data-theme="light"] .bt-icon-center {
+  background: linear-gradient(135deg, #814BEE, #6c3dca);
+  box-shadow: 0 0 30px rgba(129,75,238,0.35);
+}
+
+/* Stats boxes */
+html[data-theme="light"] .bt-stat-box {
+  background: rgba(129,75,238,0.06);
+  border-color: rgba(129,75,238,0.16);
+}
+html[data-theme="light"] .bt-stat-val { color: #814BEE; }
+html[data-theme="light"] .bt-stat-lbl { color: #9e8ebf; }
+
+/* Right panel cards */
+html[data-theme="light"] .bt-card {
+  background: rgba(255, 255, 255, 0.95);
+  border-color: rgba(129, 75, 238, 0.16);
+  box-shadow: 0 4px 20px rgba(129,75,238,0.07);
+}
+html[data-theme="light"] .bt-card-header {
+  background: rgba(248, 245, 255, 0.8);
+  border-bottom-color: rgba(129, 75, 238, 0.12);
+}
+html[data-theme="light"] .bt-card-title { color: #3a2460; }
+
+/* Scan form */
+html[data-theme="light"] .bt-scan-form label { color: #6b5c8a; }
+html[data-theme="light"] .bt-scan-form select,
+html[data-theme="light"] .bt-scan-form input {
+  background: #faf8ff;
+  border-color: rgba(129,75,238,0.22);
+  color: #1a1028;
+}
+html[data-theme="light"] .bt-scan-form select:focus,
+html[data-theme="light"] .bt-scan-form input:focus { border-color: #814BEE; }
+
+/* Users table */
+html[data-theme="light"] .bt-users-table thead tr { border-bottom-color: rgba(129,75,238,0.18); }
+html[data-theme="light"] .bt-users-table th { color: rgba(129,75,238,0.65); }
+html[data-theme="light"] .bt-users-table td { border-bottom-color: rgba(129,75,238,0.08); }
+html[data-theme="light"] .bt-users-table tr:hover td { background: rgba(129,75,238,0.04); }
+html[data-theme="light"] .bt-mac-cell { color: #814BEE; }
+html[data-theme="light"] .bt-mac-none { color: #9e8ebf; }
+
+/* Set MAC button */
+html[data-theme="light"] .bt-set-btn {
+  background: rgba(129,75,238,0.07);
+  border-color: rgba(129,75,238,0.25);
+  color: #814BEE;
+}
+html[data-theme="light"] .bt-set-btn:hover {
+  background: rgba(129,75,238,0.15);
+  border-color: #814BEE;
+  color: #6c3dca;
+}
+
+/* Config row / pills */
+html[data-theme="light"] .bt-config-row { color: #6b5c8a; }
+html[data-theme="light"] .bt-config-pill {
+  background: rgba(129,75,238,0.08);
+  border-color: rgba(129,75,238,0.2);
+  color: #814BEE;
+}
+
+/* RSSI bar track */
+html[data-theme="light"] .rssi-bar-track { background: rgba(129,75,238,0.12); }
+html[data-theme="light"] .rssi-label { color: #9e8ebf; }
+html[data-theme="light"] .bt-result-detail { color: #6b5c8a; }
+html[data-theme="light"] .bt-scanning-text { color: #9e8ebf; }
+html[data-theme="light"] .scan-all-progress { color: #9e8ebf; border-top-color: rgba(129,75,238,0.12); }
+
+/* Modal */
+html[data-theme="light"] .bt-modal-backdrop { background: rgba(129,75,238,0.15); }
+html[data-theme="light"] .bt-modal {
+  background: rgba(255,255,255,0.99);
+  border-color: rgba(129,75,238,0.2);
+  box-shadow: 0 25px 60px rgba(129,75,238,0.2);
+}
+html[data-theme="light"] .bt-modal-title { color: #1a1028; }
+html[data-theme="light"] .bt-modal-field label { color: #6b5c8a; }
+html[data-theme="light"] .bt-modal-field input {
+  background: #faf8ff;
+  border-color: rgba(129,75,238,0.22);
+  color: #1a1028;
+}
+html[data-theme="light"] .bt-modal-field input:focus { border-color: #814BEE; }
+html[data-theme="light"] .bt-modal-hint { color: #9e8ebf; }
+html[data-theme="light"] .bt-modal-actions .btn-cancel {
+  background: rgba(129,75,238,0.05);
+  border-color: rgba(129,75,238,0.2);
+  color: #6b5c8a;
+}
+html[data-theme="light"] .bt-modal-actions .btn-cancel:hover {
+  background: rgba(129,75,238,0.1);
+  color: #3a2460;
+}
+html[data-theme="light"] .bt-modal-actions .btn-save {
+  background: linear-gradient(135deg, #814BEE, #6c3dca);
+}
 </style>
 
 <!-- ══════════════════════════════════════════════════════════════════ -->
@@ -251,10 +428,29 @@
       <p class="bt-modal-hint">Format: XX:XX:XX:XX:XX:XX (hexadecimal, colon-separated)</p>
     </div>
 
-    <div class="bt-modal-field">
-      <label>How to find your phone's Bluetooth MAC</label>
+    <!-- Scan Nearby button -->
+    <div class="bt-modal-field" style="margin-bottom:.5rem">
+      <label>Or scan for nearby Bluetooth devices</label>
+      <button class="bt-nearby-scan-btn" id="btnScanNearby" onclick="scanNearbyForModal()">
+        <svg width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2">
+          <polyline points="6.5 6.5 17.5 17.5 12 23 12 1 17.5 6.5 6.5 17.5"></polyline>
+        </svg>
+        Scan Nearby Bluetooth (Phones &amp; Devices in Range)
+      </button>
+    </div>
+
+    <!-- Nearby device list (hidden until scan completes) -->
+    <div class="bt-nearby-list" id="nearbyDeviceList">
+      <div class="bt-nearby-list-header">
+        <span>Nearby Devices Detected</span>
+        <span class="bt-nearby-count" id="nearbyDeviceCount">0 found</span>
+      </div>
+      <div id="nearbyDeviceItems"></div>
+    </div>
+
+    <div class="bt-modal-field" style="margin-top:.75rem;margin-bottom:.25rem">
       <p class="bt-modal-hint" style="margin-top:0">
-        <strong>Android:</strong> Settings → About Phone → Status → Bluetooth Address<br>
+        <strong>Android:</strong> Settings &rarr; About Phone &rarr; Status &rarr; Bluetooth Address<br>
         <strong>Note:</strong> iOS 14+ randomises BLE MAC. Use Android phones for reliable proximity detection.
       </p>
     </div>
@@ -539,6 +735,19 @@ function openMacModal(btn) {
   document.getElementById('macModalUserName').textContent =
     "Enter the phone's Bluetooth MAC address for " + fullName;
   document.getElementById('macInput').value = currentMac || '';
+
+  // Reset nearby device list each time modal opens
+  document.getElementById('nearbyDeviceList').style.display = 'none';
+  document.getElementById('nearbyDeviceItems').innerHTML = '';
+  document.getElementById('nearbyDeviceCount').textContent = '0 found';
+  const scanBtn = document.getElementById('btnScanNearby');
+  if (scanBtn) {
+    scanBtn.disabled = false;
+    scanBtn.innerHTML = `<svg width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2">
+      <polyline points="6.5 6.5 17.5 17.5 12 23 12 1 17.5 6.5 6.5 17.5"></polyline>
+    </svg> Scan Nearby Bluetooth (Phones &amp; Devices in Range)`;
+  }
+
   document.getElementById('macModal').classList.add('open');
   document.getElementById('macInput').focus();
 }
@@ -559,6 +768,100 @@ document.getElementById('macInput').addEventListener('input', function() {
   if (formatted.length > 17) formatted = formatted.slice(0, 17);
   this.value = formatted;
 });
+
+/* ── Scan Nearby Devices for MAC Modal ──────────────────────────── */
+async function scanNearbyForModal() {
+  const scanBtn = document.getElementById('btnScanNearby');
+  const listWrap = document.getElementById('nearbyDeviceList');
+  const itemsEl  = document.getElementById('nearbyDeviceItems');
+  const countEl  = document.getElementById('nearbyDeviceCount');
+
+  scanBtn.disabled = true;
+  scanBtn.innerHTML = `<span class="bt-spin"><svg width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2">
+    <path d="M21 12a9 9 0 1 1-18 0 9 9 0 0 1 18 0"/></svg></span> Scanning… (up to 8s)`;
+
+  listWrap.style.display = 'block';
+  itemsEl.innerHTML = `<div class="bt-nearby-scanning">
+    <span class="bt-spin"><svg width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2">
+      <path d="M21 12a9 9 0 1 1-18 0 9 9 0 0 1 18 0"/></svg></span>
+    Scanning for nearby Bluetooth devices…
+  </div>`;
+  countEl.textContent = 'Scanning…';
+
+  try {
+    const resp = await fetch('/bluetooth/scan-devices', {
+      method: 'POST',
+      headers: { 'Content-Type': 'application/json', 'X-CSRFToken': CSRF_TOKEN },
+      body: JSON.stringify({ duration: 8 })
+    });
+    const data = await resp.json();
+
+    if (!data.success) throw new Error(data.message || 'Scan failed');
+
+    // ── KEY FILTER: only show devices that have a real BLE RSSI
+    // (rssi !== null means the device was seen in the live BLE advertisement scan,
+    //  i.e. it is physically nearby and broadcasting). Registry-only paired devices
+    //  that are not currently in range will have rssi === null and are excluded.
+    const nearby = (data.devices || []).filter(d => d.rssi !== null && d.rssi !== undefined);
+
+    // Sort strongest signal first
+    nearby.sort((a, b) => (b.rssi || -999) - (a.rssi || -999));
+
+    countEl.textContent = nearby.length + ' found';
+
+    if (nearby.length === 0) {
+      itemsEl.innerHTML = `<div class="bt-nearby-empty">
+        <svg width="24" height="24" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.5" style="opacity:.4;display:block;margin:0 auto .5rem">
+          <polyline points="6.5 6.5 17.5 17.5 12 23 12 1 17.5 6.5 6.5 17.5"></polyline>
+        </svg>
+        No Bluetooth devices currently in range.<br>
+        <span style="font-size:.72rem;opacity:.7">Make sure the phone's Bluetooth is ON and nearby.</span>
+      </div>`;
+    } else {
+      itemsEl.innerHTML = nearby.map(dev => {
+        const rssi = dev.rssi;
+        const pct  = Math.min(100, Math.max(0, ((rssi + 100) / 70) * 100));
+        const strength = pct >= 60 ? 'strong' : pct >= 30 ? 'medium' : 'weak';
+        const strengthLabel = pct >= 60 ? 'Strong' : pct >= 30 ? 'Medium' : 'Weak';
+        const initial = (dev.name || '?')[0].toUpperCase();
+        return `
+        <div class="bt-nearby-item" onclick="selectNearbyDevice('${dev.mac}', '${(dev.name || '').replace(/'/g,"\\'")}')">
+          <div class="bt-nearby-item-icon">${initial}</div>
+          <div class="bt-nearby-item-info">
+            <div class="bt-nearby-item-name">${dev.name || 'Unknown Device'}</div>
+            <div class="bt-nearby-item-mac">${dev.mac}</div>
+          </div>
+          <span class="bt-nearby-item-rssi ${strength}">${rssi} dBm &bull; ${strengthLabel}</span>
+        </div>`;
+      }).join('');
+    }
+
+  } catch(err) {
+    countEl.textContent = 'Error';
+    itemsEl.innerHTML = `<div class="bt-nearby-empty" style="color:#ef4444">
+      Scan error: ${err.message}
+    </div>`;
+  } finally {
+    scanBtn.disabled = false;
+    scanBtn.innerHTML = `<svg width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2">
+      <polyline points="6.5 6.5 17.5 17.5 12 23 12 1 17.5 6.5 6.5 17.5"></polyline>
+    </svg> Scan Again`;
+  }
+}
+
+/* ── Select a nearby device → auto-fill MAC input ───────────────── */
+function selectNearbyDevice(mac, name) {
+  document.getElementById('macInput').value = mac;
+  // Highlight selection with a brief visual flash
+  const input = document.getElementById('macInput');
+  input.style.borderColor = '#10b981';
+  input.style.boxShadow   = '0 0 0 3px rgba(16,185,129,.2)';
+  setTimeout(() => {
+    input.style.borderColor = '';
+    input.style.boxShadow   = '';
+  }, 1200);
+  showToast(`Selected: ${name || mac}`, 'success');
+}
 
 async function saveMac() {
   if (!currentModalUserId) return;

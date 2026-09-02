@@ -21,11 +21,15 @@ The cache is invalidated automatically when photo_path changes (e.g. user update
 their profile picture), because the key changes.
 """
 
+import collections
+import importlib
+import importlib.util
 import io
 import os
 import sys
 import site
 import logging
+import threading
 
 # ---------------------------------------------------------------------------
 # Ensure user site-packages are on sys.path so packages installed with
@@ -40,28 +44,76 @@ if _user_site and _user_site not in sys.path:
 logger = logging.getLogger(__name__)
 
 # ---------------------------------------------------------------------------
-# Optional import — graceful degradation if face_recognition is not installed
+# Lazy availability check — do NOT import face_recognition at module level.
+# Importing it at startup forces dlib to load its CNN/HOG models which takes
+# 15–45 s and blocks the server from accepting connections.
+# Instead we check whether the package is present using importlib.util and
+# defer the actual import to the first function call that needs it.
 # ---------------------------------------------------------------------------
-try:
-    import face_recognition                  # type: ignore[import-untyped]
-    FACE_RECOGNITION_AVAILABLE = True
-except ImportError:
-    face_recognition = None                  # type: ignore[assignment]
-    FACE_RECOGNITION_AVAILABLE = False
+
+FACE_RECOGNITION_AVAILABLE: bool = importlib.util.find_spec('face_recognition') is not None
+if not FACE_RECOGNITION_AVAILABLE:
     logger.warning(
         "face_recognition library not installed. "
         "Run: pip install face_recognition  "
         "Face authentication will be unavailable."
     )
 
+# Module-level reference filled lazily on first use
+_fr = None  # will hold the face_recognition module
+
+
+def _get_fr():
+    """
+    Return the face_recognition module, importing it the first time it is
+    needed.  This keeps it out of the startup critical path.
+    """
+    global _fr, FACE_RECOGNITION_AVAILABLE
+    if _fr is not None:
+        return _fr
+    try:
+        import face_recognition as _face_recognition  # type: ignore[import-untyped]
+        _fr = _face_recognition
+        FACE_RECOGNITION_AVAILABLE = True
+    except ImportError:
+        FACE_RECOGNITION_AVAILABLE = False
+        raise RuntimeError("face_recognition library is not installed.")
+    return _fr
+
 # numpy is imported lazily inside functions to avoid crash on startup
 
 # ---------------------------------------------------------------------------
-# In-memory encoding cache
-# key  : (user_id: int, photo_path: str)
+# Thread-safe LRU in-memory encoding cache
+# key  : (user_id: str, photo_path: str)
 # value: ndarray (128-d face encoding) or None if no face detected
+#
+# Max size is bounded to _CACHE_MAX_SIZE entries to prevent unbounded memory
+# growth on long-running servers.  Least-recently-used entries are evicted
+# when the limit is reached.
 # ---------------------------------------------------------------------------
-_encoding_cache: dict = {}
+_CACHE_MAX_SIZE = 256
+_encoding_cache: collections.OrderedDict = collections.OrderedDict()
+_cache_lock = threading.Lock()
+
+
+def _cache_get(key):
+    """Return (True, value) on hit, (False, None) on miss — O(1) LRU lookup."""
+    with _cache_lock:
+        if key not in _encoding_cache:
+            return False, None
+        # Move to end (most-recently-used)
+        _encoding_cache.move_to_end(key)
+        return True, _encoding_cache[key]
+
+
+def _cache_set(key, value):
+    """Insert/update a cache entry, evicting the LRU entry if over capacity."""
+    with _cache_lock:
+        if key in _encoding_cache:
+            _encoding_cache.move_to_end(key)
+        _encoding_cache[key] = value
+        if len(_encoding_cache) > _CACHE_MAX_SIZE:
+            _encoding_cache.popitem(last=False)  # evict oldest
 
 
 # ---------------------------------------------------------------------------
@@ -83,15 +135,16 @@ def clear_cache(user_id: int | None = None) -> None:
         If provided, only invalidate cache entries for that user.
         If None (default), flush the entire cache.
     """
-    global _encoding_cache
-    if user_id is None:
-        _encoding_cache.clear()
-        logger.debug("Face encoding cache cleared (all users).")
-    else:
-        keys_to_delete = [k for k in _encoding_cache if k[0] == user_id]
-        for k in keys_to_delete:
-            del _encoding_cache[k]
-        logger.debug("Face encoding cache cleared for user_id=%s.", user_id)
+    with _cache_lock:
+        if user_id is None:
+            _encoding_cache.clear()
+            logger.debug("Face encoding cache cleared (all users).")
+        else:
+            uid_str = str(user_id)
+            keys_to_delete = [k for k in _encoding_cache if k[0] == uid_str]
+            for k in keys_to_delete:
+                del _encoding_cache[k]
+            logger.debug("Face encoding cache cleared for user_id=%s.", user_id)
 
 
 def get_user_encoding(
@@ -124,9 +177,10 @@ def get_user_encoding(
 
     cache_key = (str(user_id), photo_path)
 
-    if cache_key in _encoding_cache:
+    hit, cached_enc = _cache_get(cache_key)
+    if hit:
         logger.debug("Cache hit for user_id=%s, photo=%s", user_id, photo_path)
-        return _encoding_cache[cache_key]
+        return cached_enc
 
     # ── Fetch photo bytes (S3 preferred, local fallback) ─────────────────────
     photo_bytes = None
@@ -162,8 +216,13 @@ def get_user_encoding(
 
     # ── Encode the photo ──────────────────────────────────────────────────────
     logger.info("Encoding stored photo for user_id=%s (%s) …", user_id, photo_path)
-    image     = face_recognition.load_image_file(io.BytesIO(photo_bytes))
-    encodings = face_recognition.face_encodings(image)
+    fr        = _get_fr()
+    image     = fr.load_image_file(io.BytesIO(photo_bytes))
+    
+    # Downscale enrolled photo to max 480px — keeps dlib memory usage low
+    # (640 caused 'bad allocation' on machines with limited RAM; 480 is safe)
+    small_image, _ = _resize_for_detection(image, max_side=480)
+    encodings = fr.face_encodings(small_image)
 
     if not encodings:
         logger.warning(
@@ -171,7 +230,7 @@ def get_user_encoding(
             "Ask the user to re-upload a clear, front-facing photo.",
             user_id, photo_path,
         )
-        _encoding_cache[cache_key] = None
+        _cache_set(cache_key, None)
         return None
 
     if len(encodings) > 1:
@@ -182,7 +241,7 @@ def get_user_encoding(
         )
 
     encoding = encodings[0]
-    _encoding_cache[cache_key] = encoding
+    _cache_set(cache_key, encoding)
     logger.info("Encoding cached for user_id=%s.", user_id)
     return encoding
 
@@ -250,20 +309,60 @@ def recognize_face(
         return result
 
     known_encodings = []
-    from concurrent.futures import ThreadPoolExecutor
 
     def load_one(path):
+        """
+        Load encoding for a single path.
+        On 'bad allocation' (dlib OOM), retry once at a smaller resolution.
+        Running multiple of these concurrently is the primary cause of
+        'bad allocation' — keep max_workers=1 (sequential) to avoid it.
+        """
         try:
             return get_user_encoding(user_id, path, upload_folder)
+        except MemoryError as exc:
+            logger.warning(
+                "MemoryError loading encoding for path %s: %s — skipping.",
+                path, exc,
+            )
+            return None
         except Exception as exc:
+            exc_str = str(exc)
+            # dlib raises std::bad_alloc which surfaces as a generic Exception
+            # with 'bad allocation' in the message
+            if 'bad allocation' in exc_str or 'std::bad_alloc' in exc_str:
+                logger.warning(
+                    "bad allocation loading encoding for path %s — "
+                    "retrying at 320px resolution.", path,
+                )
+                try:
+                    # Re-encode at half the normal size to reduce peak RAM usage
+                    fr_mod = _get_fr()
+                    from aws_s3 import get_photo_bytes as _gpb
+                    pb, _ = _gpb(path)
+                    import io as _io
+                    img = fr_mod.load_image_file(_io.BytesIO(pb))
+                    small, _ = _resize_for_detection(img, max_side=320)
+                    encs = fr_mod.face_encodings(small)
+                    enc = encs[0] if encs else None
+                    _cache_set((str(user_id), path), enc)
+                    return enc
+                except Exception as retry_exc:
+                    logger.warning(
+                        "Retry also failed for path %s: %s — skipping.",
+                        path, retry_exc,
+                    )
+                    return None
             logger.warning("Failed to load encoding for path %s: %s", path, exc)
             return None
 
-    with ThreadPoolExecutor(max_workers=min(len(paths_to_check), 10)) as executor:
-        encs = list(executor.map(load_one, paths_to_check))
-        for enc in encs:
-            if enc is not None:
-                known_encodings.append(enc)
+    # ── Sequential loading (max_workers=1) ──────────────────────────────────
+    # dlib's CNN face encoder uses ~200-500 MB RAM per call. Running multiple
+    # simultaneously with ThreadPoolExecutor caused 'bad allocation' crashes.
+    # Sequential processing is safer and only marginally slower for ≤5 samples.
+    for path in paths_to_check:
+        enc = load_one(path)
+        if enc is not None:
+            known_encodings.append(enc)
 
     if not known_encodings:
         result["error"] = (
@@ -288,27 +387,28 @@ def recognize_face(
         result["error"] = f"Could not decode image from camera: {exc}"
         return result
 
-    # -- 3. Detect faces in the live frame ------------------------------------
-    live_locations = face_recognition.face_locations(live_image)
-    result["face_count"] = len(live_locations)
+    # -- 3. Detect and encode faces on downscaled frame for high speed -------
+    fr = _get_fr()
+    small_image, _ = _resize_for_detection(live_image, max_side=640)
+    small_locations = fr.face_locations(small_image)
+    result["face_count"] = len(small_locations)
 
-    if not live_locations:
+    if not small_locations:
         result["error"] = (
             "No face detected in the camera frame. "
             "Ensure you are well-lit and facing the camera directly."
         )
         return result
 
-    if len(live_locations) > 1:
+    if len(small_locations) > 1:
         logger.info(
             "Multiple faces (%d) in live frame for user_id=%s — using largest.",
-            len(live_locations), user_id,
+            len(small_locations), user_id,
         )
-        # Pick the largest bounding box (most prominent face)
-        live_locations = [_largest_face(live_locations)]
+        small_locations = [_largest_face(small_locations)]
 
-    # -- 4. Encode the live face ----------------------------------------------
-    live_encodings = face_recognition.face_encodings(live_image, live_locations)
+    # -- 4. Encode the live face directly on downscaled frame -----------------
+    live_encodings = fr.face_encodings(small_image, small_locations)
     if not live_encodings:
         result["error"] = "Could not encode face in the live frame. Please retry."
         return result
@@ -316,7 +416,7 @@ def recognize_face(
     live_encoding = live_encodings[0]
 
     # -- 5. Compare -----------------------------------------------------------
-    distances = face_recognition.face_distance(known_encodings, live_encoding)
+    distances = fr.face_distance(known_encodings, live_encoding)
     if len(distances) == 0:
         result["error"] = "Comparison failed. Please retry."
         return result
@@ -349,3 +449,35 @@ def _largest_face(locations: list) -> tuple:
         top, right, bottom, left = loc
         return (bottom - top) * (right - left)
     return max(locations, key=area)
+
+
+def _resize_for_detection(image, max_side: int = 640):
+    """
+    Downscale *image* (numpy RGB array) so its longest dimension is at most
+    *max_side* pixels, while preserving the aspect ratio.
+
+    Returns (resized_image, scale_factor) where scale_factor is the ratio
+    original / resized.  When the image is already small enough the original
+    is returned unchanged with scale_factor=1.0.
+
+    The caller uses scale_factor to map bounding-box coordinates found on the
+    resized image back to the original resolution for the encoding step.
+    """
+    import numpy as _np
+    h, w = image.shape[:2]
+    longest = max(h, w)
+    if longest <= max_side:
+        return image, 1.0
+
+    scale    = max_side / longest
+    new_w    = max(1, int(w * scale))
+    new_h    = max(1, int(h * scale))
+
+    try:
+        from PIL import Image as _PILImage
+        pil = _PILImage.fromarray(image)
+        pil = pil.resize((new_w, new_h), _PILImage.BILINEAR)
+        return _np.array(pil), 1.0 / scale   # scale_factor: resized→original
+    except ImportError:
+        # PIL not available — skip resize (graceful degradation)
+        return image, 1.0

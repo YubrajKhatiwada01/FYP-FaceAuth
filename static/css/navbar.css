@@ -1,0 +1,248 @@
+﻿/* navbar.css - Navigation Bar, Brand Logo, Links, CTA Button */
+
+.nav-shell {
+  position: fixed;
+  top: 0;
+  left: 0;
+  right: 0;
+  z-index: 1000;
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  gap: 24px;
+  min-height: 78px;
+  padding: 14px clamp(18px, 5vw, 72px);
+  border-bottom: 1px solid rgba(255, 255, 255, 0.08);
+  background: rgba(13, 15, 16, 0.95);
+  backdrop-filter: blur(20px);
+  -webkit-backdrop-filter: blur(20px);
+  box-shadow: 0 2px 20px rgba(0, 0, 0, 0.3);
+}
+
+.brand {
+  display: inline-flex;
+  align-items: center;
+  gap: 12px;
+  min-width: max-content;
+}
+
+.brand-mark {
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  width: 64px;
+  height: 64px;
+  border-radius: 8px;
+  overflow: hidden;
+}
+
+.brand-mark img {
+  width: 100%;
+  height: 100%;
+  object-fit: contain;
+  opacity: 0.95;
+  filter: brightness(1.1) contrast(1.1) saturate(1.1);
+}
+
+/* ── Theme-specific logo visibility ─────────────────────────────────── */
+/* Dark mode (default): show dark logo, hide light logo */
+.logo-light { display: none; }
+.logo-dark  { display: block; }
+
+/* Light mode: show light logo, hide dark logo */
+[data-theme="light"] .logo-light { display: block; }
+[data-theme="light"] .logo-dark  { display: none; }
+
+/* Light mode: make dashboard sidebar logo a bit bigger */
+[data-theme="light"] .sidebar-brand .logo-light {
+  width: 115%;
+  height: 115%;
+  object-fit: contain;
+}
+
+.brand-mark.large {
+  width: 120px;
+  height: 120px;
+  margin: 0 auto;
+  border-radius: 8px;
+  overflow: hidden;
+}
+
+.brand-mark.large img {
+  width: 100%;
+  height: 100%;
+  object-fit: contain;
+  opacity: 0.9;
+  filter: brightness(1.05) contrast(1.15) saturate(1.05);
+}
+
+.brand strong {
+  display: block;
+  font-size: 1.34rem;
+  line-height: 1;
+  color: var(--cyan-soft);
+  letter-spacing: 0;
+}
+
+.brand small {
+  display: block;
+  margin-top: 4px;
+  color: var(--muted);
+  font-family: var(--mono);
+  font-size: 0.72rem;
+  letter-spacing: 0.08em;
+  text-transform: uppercase;
+}
+
+.nav-links {
+  display: flex;
+  align-items: center;
+  gap: clamp(4px, 1.5vw, 12px);
+  color: #dbe4e6;
+  font-weight: 600;
+}
+
+.nav-links a {
+  position: relative;
+  padding: 12px 10px;
+  border-radius: 8px;
+  transition: all 0.3s cubic-bezier(0.4, 0, 0.2, 1);
+  overflow: hidden;
+}
+
+.nav-links a::before {
+  content: '';
+  position: absolute;
+  top: 0;
+  left: 0;
+  right: 0;
+  bottom: 0;
+  background: linear-gradient(135deg, rgba(21, 213, 238, 0.1), rgba(17, 174, 232, 0.1));
+  border-radius: 8px;
+  opacity: 0;
+  transform: scale(0.8);
+  transition: all 0.3s cubic-bezier(0.4, 0, 0.2, 1);
+  z-index: -1;
+}
+
+.nav-links a::after {
+  content: '';
+  position: absolute;
+  bottom: 0;
+  left: 50%;
+  width: 0;
+  height: 2px;
+  background: linear-gradient(90deg, #15d5ee, #11aee8);
+  transform: translateX(-50%);
+  transition: width 0.3s cubic-bezier(0.4, 0, 0.2, 1);
+  border-radius: 1px;
+}
+
+.nav-links a:hover {
+  color: var(--cyan-soft);
+  transform: translateY(-2px);
+  text-shadow: 0 0 20px rgba(21, 213, 238, 0.3);
+}
+
+.nav-links a:hover::before {
+  opacity: 1;
+  transform: scale(1);
+}
+
+.nav-links a:hover::after {
+  width: 80%;
+}
+
+.nav-links a.is-active {
+  color: var(--cyan-soft);
+}
+
+.nav-links a.is-active::after {
+  width: 60%;
+  opacity: 0.6;
+}
+
+.nav-cta,
+.btn {
+  display: inline-flex;
+  align-items: center;
+  justify-content: center;
+  min-height: 48px;
+  border-radius: 8px;
+  font-weight: 800;
+  letter-spacing: 0.02em;
+  transition: transform 160ms ease, border-color 160ms ease, background 160ms ease;
+}
+
+.nav-cta {
+  padding: 0 18px;
+  border: 1px solid var(--line-strong);
+  color: var(--cyan-soft);
+  font-family: var(--mono);
+  font-size: 0.78rem;
+  text-transform: uppercase;
+  position: relative;
+  overflow: hidden;
+}
+
+.nav-cta::before {
+  content: '';
+  position: absolute;
+  top: 0;
+  left: -100%;
+  width: 100%;
+  height: 100%;
+  background: linear-gradient(90deg, transparent, rgba(21, 213, 238, 0.1), transparent);
+  transition: left 0.5s ease;
+}
+
+.nav-cta:hover::before {
+  left: 100%;
+}
+
+.nav-cta:hover {
+  transform: translateY(-2px);
+  border-color: var(--cyan);
+  box-shadow: 0 8px 25px rgba(21, 213, 238, 0.2);
+  text-shadow: 0 0 10px rgba(21, 213, 238, 0.3);
+}
+
+.btn {
+  padding: 0 24px;
+  border: 1px solid transparent;
+}
+
+.btn:hover,
+.nav-cta:hover {
+  transform: translateY(-2px);
+}
+
+.btn-primary {
+  color: #062126;
+  background: linear-gradient(135deg, #1de0f3, #13b9df);
+  box-shadow: 0 16px 34px rgba(21, 213, 238, 0.24);
+}
+
+.btn-secondary {
+  border-color: var(--line-strong);
+  color: var(--cyan-soft);
+  background: rgba(8, 10, 11, 0.72);
+}
+
+.nav-toggle {
+  display: none;
+  width: 44px;
+  height: 44px;
+  border: 1px solid var(--line);
+  border-radius: 8px;
+  background: rgba(255, 255, 255, 0.04);
+}
+
+.nav-toggle span {
+  display: block;
+  width: 18px;
+  height: 2px;
+  margin: 4px auto;
+  background: var(--cyan-soft);
+}
+

@@ -9,14 +9,14 @@ The Lambda function handles:
   • SNS alert notifications for denied access
   • Secondary audit logging inside AWS
 
-Invocation is fire-and-forget (InvocationType='Event') so it does NOT
-block or slow down the Flask HTTP response.  If Lambda is not yet
-deployed the failure is logged as a warning and the auth flow continues
-normally.
+Invocation runs in a daemon background thread so it NEVER blocks the Flask
+HTTP response.  If Lambda is not yet deployed the failure is logged as a
+warning and the auth flow continues normally.
 """
 
 import json
 import logging
+import threading
 
 from aws_config import get_lambda, LAMBDA_FUNCTION_NAME
 
@@ -37,7 +37,7 @@ def trigger_post_auth(
     Asynchronously invoke the post-authentication Lambda trigger.
 
     This call returns immediately — Lambda processes the event in the
-    background.  The Flask response is never delayed by this call.
+    background via a daemon thread.  The Flask response is never delayed.
 
     Args:
         user_id:      UUID of the user being authenticated
@@ -49,8 +49,7 @@ def trigger_post_auth(
         event_type:   'Access Granted' or 'Access Denied'
 
     Returns:
-        True if Lambda was successfully invoked, False otherwise.
-        Either way the auth flow is unaffected.
+        True immediately (invocation happens in a daemon background thread).
     """
     payload = {
         'user_id':      user_id,
@@ -63,25 +62,26 @@ def trigger_post_auth(
         'source':       'FaceAuth-Local',
     }
 
-    try:
-        client = get_lambda()
-        client.invoke(
-            FunctionName   = LAMBDA_FUNCTION_NAME,
-            InvocationType = 'Event',                        # async — no wait
-            Payload        = json.dumps(payload).encode(),
-        )
-        logger.info(
-            "Lambda trigger fired — user='%s', event='%s', match=%s",
-            username, event_type, match,
-        )
-        return True
+    def _invoke():
+        try:
+            client = get_lambda()
+            client.invoke(
+                FunctionName   = LAMBDA_FUNCTION_NAME,
+                InvocationType = 'Event',                        # async — no wait
+                Payload        = json.dumps(payload).encode(),
+            )
+            logger.info(
+                "Lambda trigger fired — user='%s', event='%s', match=%s",
+                username, event_type, match,
+            )
+        except Exception as exc:
+            # Lambda trigger is optional — a missing or misconfigured function
+            # should never break the authentication experience.
+            logger.warning(
+                "Lambda trigger skipped (non-fatal): %s. "
+                "Deploy the Lambda function to enable post-auth actions.",
+                exc,
+            )
 
-    except Exception as exc:
-        # Lambda trigger is optional — a missing or misconfigured function
-        # should never break the authentication experience.
-        logger.warning(
-            "Lambda trigger skipped (non-fatal): %s. "
-            "Deploy the Lambda function to enable post-auth actions.",
-            exc,
-        )
-        return False
+    threading.Thread(target=_invoke, daemon=True, name="lambda-trigger").start()
+    return True

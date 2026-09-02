@@ -6,9 +6,97 @@
     <meta name="csrf-token" content="{{ csrf_token() }}">
     <title>{% block title %}FaceAuth{% endblock %}</title>
     <link rel="icon" type="image/png" href="{{ url_for('static', filename='images/final logo.png') }}">
+    <!-- ── Anti-flash theme init: apply saved theme before first paint ──────── -->
+    <script>
+      (function() {
+        var saved = localStorage.getItem('faceauth-theme');
+        if (saved === 'light') {
+          document.documentElement.setAttribute('data-theme', 'light');
+        } else {
+          document.documentElement.removeAttribute('data-theme');
+        }
+      })();
+    </script>
     <link rel="stylesheet" href="{{ url_for('static', filename='css/style.css') }}">
+    <style>
+      /* ── Global page-transition progress bar ─────────────────────────── */
+      #page-progress {
+        position: fixed;
+        top: 0; left: 0;
+        height: 3px;
+        width: 0%;
+        background: linear-gradient(90deg, var(--accent, #15d5ee), var(--ok, #39e88f), var(--accent, #15d5ee));
+        background-size: 200% 100%;
+        z-index: 99999;
+        transition: width 0.3s ease, opacity 0.4s ease;
+        opacity: 0;
+        pointer-events: none;
+        animation: shimmer 1.5s linear infinite;
+      }
+      #page-progress.is-active {
+        opacity: 1;
+      }
+      @keyframes shimmer {
+        0%   { background-position: 100% 0; }
+        100% { background-position: -100% 0; }
+      }
+
+      /* ── Full-screen overlay spinner for page transitions ────────────── */
+      #page-overlay {
+        display: none;
+        position: fixed;
+        inset: 0;
+        background: rgba(13,15,17,0.72);
+        backdrop-filter: blur(4px);
+        z-index: 99998;
+        align-items: center;
+        justify-content: center;
+        flex-direction: column;
+        gap: 16px;
+      }
+      html[data-theme="light"] #page-overlay {
+        background: rgba(248,245,255,0.82);
+      }
+      #page-overlay.is-visible {
+        display: flex;
+      }
+      .page-spinner {
+        width: 44px;
+        height: 44px;
+        border: 3px solid rgba(21,213,238,0.2);
+        border-top-color: #15d5ee;
+        border-radius: 50%;
+        animation: spin 0.75s linear infinite;
+      }
+      html[data-theme="light"] .page-spinner {
+        border-color: rgba(129,75,238,0.2);
+        border-top-color: #814BEE;
+      }
+      .page-spinner-label {
+        font-family: 'JetBrains Mono', 'Cascadia Mono', Consolas, monospace;
+        font-size: 0.78rem;
+        color: rgba(191,250,255,0.7);
+        letter-spacing: 0.06em;
+      }
+      html[data-theme="light"] .page-spinner-label {
+        color: rgba(129,75,238,0.7);
+      }
+      @keyframes spin {
+        to { transform: rotate(360deg); }
+      }
+    </style>
   </head>
   <body{% if body_class %} class="{{ body_class }}{% if active_page in ['dashboard', 'users', 'access_control', 'logs', 'settings', 'authentication', 'bluetooth'] %} dashboard-page{% endif %}"{% elif active_page in ['dashboard', 'users', 'access_control', 'logs', 'settings', 'authentication', 'bluetooth'] %} class="dashboard-page"{% endif %}>
+
+    <!-- Global page-transition progress bar -->
+    <div id="page-progress"></div>
+
+    <!-- Full-screen loading overlay (shown on nav clicks) -->
+    <div id="page-overlay">
+      <div class="page-spinner"></div>
+      <span class="page-spinner-label">Loading...</span>
+    </div>
+
     <div class="site-shell">
       {% set dashboard_pages = ['dashboard', 'users', 'access_control', 'logs', 'settings', 'authentication', 'bluetooth'] %}
       {% if active_page not in dashboard_pages %}
@@ -16,7 +104,8 @@
         <header class="nav-shell">
           <a class="brand" href="{{ url_for('landing') }}" aria-label="FaceAuth home">
             <span class="brand-mark" aria-hidden="true">
-              <img src="{{ url_for('static', filename='images/final logo.png') }}" alt="FaceAuth Logo">
+              <img src="{{ url_for('static', filename='images/final logo.png') }}" alt="FaceAuth Logo" class="logo-dark">
+              <img src="{{ url_for('static', filename='images/final logo 2.png') }}" alt="FaceAuth Logo" class="logo-light">
             </span>
             <span>
               <strong>FaceAuth</strong>
@@ -36,6 +125,26 @@
             <a class="{{ 'is-active' if active_page == 'login' else '' }}" href="{{ url_for('login') }}">Login</a>
           </nav>
 
+          <!-- Theme Toggle -->
+          <button class="theme-toggle" id="themeToggleBtn" type="button" aria-label="Toggle dark/light mode" title="Toggle dark/light mode">
+            <!-- Moon icon (shown in dark mode) -->
+            <svg class="icon-moon" xmlns="http://www.w3.org/2000/svg" width="18" height="18" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round">
+              <path d="M21 12.79A9 9 0 1 1 11.21 3 7 7 0 0 0 21 12.79z"/>
+            </svg>
+            <!-- Sun icon (shown in light mode) -->
+            <svg class="icon-sun" xmlns="http://www.w3.org/2000/svg" width="18" height="18" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round">
+              <circle cx="12" cy="12" r="5"/>
+              <line x1="12" y1="1" x2="12" y2="3"/>
+              <line x1="12" y1="21" x2="12" y2="23"/>
+              <line x1="4.22" y1="4.22" x2="5.64" y2="5.64"/>
+              <line x1="18.36" y1="18.36" x2="19.78" y2="19.78"/>
+              <line x1="1" y1="12" x2="3" y2="12"/>
+              <line x1="21" y1="12" x2="23" y2="12"/>
+              <line x1="4.22" y1="19.78" x2="5.64" y2="18.36"/>
+              <line x1="18.36" y1="5.64" x2="19.78" y2="4.22"/>
+            </svg>
+          </button>
+
           <a class="nav-cta" href="{{ url_for('login') }}">Initialize Access</a>
         </header>
       {% endblock %}
@@ -54,7 +163,8 @@
             <div class="footer-section footer-brand">
               <div class="footer-logo">
                 <div class="brand-mark" aria-hidden="true">
-                  <img src="{{ url_for('static', filename='images/final logo.png') }}" alt="FaceAuth Logo">
+                  <img src="{{ url_for('static', filename='images/final logo.png') }}" alt="FaceAuth Logo" class="logo-dark">
+                  <img src="{{ url_for('static', filename='images/final logo 2.png') }}" alt="FaceAuth Logo" class="logo-light">
                 </div>
                 <div>
                   <strong>FaceAuth</strong>
@@ -151,5 +261,70 @@
     </div>
 
     <script src="{{ url_for('static', filename='js/main.js') }}"></script>
+
+    <script>
+    /* ── Global page-transition loader ──────────────────────────────────── */
+    (function () {
+      const bar     = document.getElementById('page-progress');
+      const overlay = document.getElementById('page-overlay');
+      if (!bar) return;
+
+      let _timer = null;
+
+      function startLoad(label) {
+        clearTimeout(_timer);
+        bar.style.width = '0%';
+        bar.classList.add('is-active');
+        // Animate bar quickly to ~85% then stall
+        requestAnimationFrame(() => {
+          bar.style.transition = 'width 0.25s ease';
+          bar.style.width = '30%';
+          setTimeout(() => { bar.style.width = '65%'; }, 250);
+          setTimeout(() => { bar.style.width = '85%'; }, 600);
+        });
+        if (overlay) {
+          overlay.querySelector('.page-spinner-label').textContent = label || 'Loading…';
+          overlay.classList.add('is-visible');
+        }
+      }
+
+      function finishLoad() {
+        bar.style.transition = 'width 0.15s ease, opacity 0.3s ease 0.15s';
+        bar.style.width = '100%';
+        if (overlay) overlay.classList.remove('is-visible');
+        _timer = setTimeout(() => {
+          bar.classList.remove('is-active');
+          bar.style.width = '0%';
+        }, 500);
+      }
+
+      // Attach to sidebar/nav links (skip same-page anchors, modals, external)
+      document.addEventListener('click', function (e) {
+        const a = e.target.closest('a[href]');
+        if (!a) return;
+        const href = a.getAttribute('href') || '';
+        if (
+          href.startsWith('#') ||
+          href.startsWith('javascript') ||
+          href.startsWith('mailto') ||
+          a.target === '_blank' ||
+          e.ctrlKey || e.metaKey || e.shiftKey
+        ) return;
+        // Only trigger for internal links
+        try {
+          const url = new URL(href, window.location.origin);
+          if (url.origin !== window.location.origin) return;
+        } catch (_) { return; }
+        startLoad('Loading…');
+      }, true);
+
+      // Hide when page finishes loading
+      window.addEventListener('pageshow', finishLoad);
+      window.addEventListener('load',     finishLoad);
+
+      // Expose for manual use (e.g. AJAX calls)
+      window.PageLoader = { start: startLoad, finish: finishLoad };
+    })();
+    </script>
   </body>
 </html>

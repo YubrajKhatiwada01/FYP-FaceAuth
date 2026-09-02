@@ -1,0 +1,1322 @@
+/* light-mode.css - All html[data-theme='light'] overrides */
+/* Body, Navbar, Hero, Features, Buttons, Login, Footer, Dashboard, Tables, Modals, Forms, Auth, Logs, Settings */
+
+/* ═══════════════════════════════════════════════════════════════════════════
+   LIGHT MODE OVERRIDES
+   All hardcoded dark colors are overridden here for html[data-theme="light"]
+   ═══════════════════════════════════════════════════════════════════════════ */
+
+/* ── Body & backgrounds ──────────────────────────────────────────────────── */
+html[data-theme="light"] body {
+  background:
+    linear-gradient(90deg, rgba(129, 75, 238, 0.04) 1px, transparent 1px),
+    linear-gradient(180deg, rgba(129, 75, 238, 0.03) 1px, transparent 1px),
+    #f8f5ff;
+  background-size: 72px 72px, 72px 72px, auto;
+  color: var(--text);
+}
+
+/* ── Navbar ──────────────────────────────────────────────────────────────── */
+html[data-theme="light"] .nav-shell {
+  background: rgba(255, 255, 255, 0.96);
+  border-bottom: 1px solid rgba(129, 75, 238, 0.12);
+  box-shadow: 0 2px 20px rgba(129, 75, 238, 0.08);
+}
+
+html[data-theme="light"] .nav-links {
+  color: #3a2460;
+}
+
+html[data-theme="light"] .nav-links a::before {
+  background: linear-gradient(135deg, rgba(129, 75, 238, 0.08), rgba(108, 61, 202, 0.08));
+}
+
+html[data-theme="light"] .nav-links a::after {
+  background: linear-gradient(90deg, #814BEE, #6c3dca);
+}
+
+html[data-theme="light"] .nav-links a:hover {
+  color: #814BEE;
+  text-shadow: 0 0 20px rgba(129, 75, 238, 0.25);
+}
+
+html[data-theme="light"] .nav-links a.is-active {
+  color: #814BEE;
+}
+
+html[data-theme="light"] .brand strong {
+  color: #814BEE;
+}
+
+html[data-theme="light"] .brand small {
+  color: var(--muted);
+}
+
+html[data-theme="light"] .nav-cta {
+  border-color: rgba(129, 75, 238, 0.36);
+  color: #814BEE;
+}
+
+html[data-theme="light"] .nav-cta::before {
+  background: linear-gradient(90deg, transparent, rgba(129, 75, 238, 0.08), transparent);
+}
+
+html[data-theme="light"] .nav-cta:hover {
+  border-color: #814BEE;
+  box-shadow: 0 8px 25px rgba(129, 75, 238, 0.18);
+  text-shadow: none;
+}
+
+html[data-theme="light"] .nav-toggle {
+  border-color: rgba(129, 75, 238, 0.2);
+  background: rgba(129, 75, 238, 0.04);
+}
+
+html[data-theme="light"] .nav-toggle span {
+  background: #814BEE;
+}
+
+html[data-theme="light"] .nav-links.is-open {
+  background: rgba(255, 255, 255, 0.98);
+  border-color: rgba(129, 75, 238, 0.18);
+  box-shadow: 0 20px 40px rgba(129, 75, 238, 0.14);
+}
+
+/* ── Hero Section ────────────────────────────────────────────────────────── */
+html[data-theme="light"] .hero-bg {
+  background-image:
+    linear-gradient(90deg, rgba(248, 245, 255, 0.15), rgba(248, 245, 255, 0.92) 58%, #f8f5ff),
+    linear-gradient(180deg, rgba(248, 245, 255, 0.2), #f8f5ff 92%),
+    url("../images/faceauth-scan-reference.png");
+  opacity: 0.88;
+}
+
+html[data-theme="light"] .hero-grid {
+  background:
+    linear-gradient(90deg, rgba(129, 75, 238, 0.06) 1px, transparent 1px),
+    linear-gradient(180deg, rgba(129, 75, 238, 0.05) 1px, transparent 1px);
+  background-size: 96px 96px;
+}
+
+html[data-theme="light"] .hero h1 {
+  color: #1a1028;
+}
+
+html[data-theme="light"] .hero-lede {
+  color: #3d2e5c;
+}
+
+html[data-theme="light"] .eyebrow {
+  color: #814BEE;
+}
+
+html[data-theme="light"] .system-strip {
+  border-color: rgba(129, 75, 238, 0.18);
+  background: rgba(129, 75, 238, 0.06);
+}
+
+html[data-theme="light"] .system-strip div,
+html[data-theme="light"] .login-status div {
+  background: rgba(255, 255, 255, 0.92);
+}
+
+html[data-theme="light"] .system-strip strong,
+html[data-theme="light"] .login-status strong {
+  color: #1a1028;
+}
+
+html[data-theme="light"] .system-strip small,
+html[data-theme="light"] .login-status small {
+  color: #6b5c8a;
+}
+
+/* ── Feature Cards & Sections ────────────────────────────────────────────── */
+html[data-theme="light"] .section {
+  border-top-color: rgba(129, 75, 238, 0.1);
+}
+
+html[data-theme="light"] .feature-card,
+html[data-theme="light"] .flow-panel,
+html[data-theme="light"] .login-card {
+  border-color: rgba(129, 75, 238, 0.14);
+  background: linear-gradient(135deg, rgba(255, 255, 255, 0.95), rgba(248, 245, 255, 0.8));
+  box-shadow: 0 8px 32px rgba(129, 75, 238, 0.08);
+}
+
+html[data-theme="light"] .feature-icon {
+  border-color: rgba(129, 75, 238, 0.2);
+  color: #814BEE;
+  background: rgba(129, 75, 238, 0.08);
+}
+
+html[data-theme="light"] .feature-card p,
+html[data-theme="light"] .architecture-copy p {
+  color: #4a3d6a;
+}
+
+html[data-theme="light"] .architecture {
+  background: #f0ebff;
+}
+
+html[data-theme="light"] .flow-node {
+  border-color: rgba(129, 75, 238, 0.16);
+  color: #1a1028;
+  background: rgba(255, 255, 255, 0.88);
+}
+
+html[data-theme="light"] .flow-line {
+  background: #814BEE;
+  box-shadow: 0 0 16px rgba(129, 75, 238, 0.35);
+}
+
+/* ── Buttons ─────────────────────────────────────────────────────────────── */
+html[data-theme="light"] .btn-primary {
+  color: #ffffff;
+  background: linear-gradient(135deg, #814BEE, #6c3dca);
+  box-shadow: 0 16px 34px rgba(129, 75, 238, 0.28);
+}
+
+html[data-theme="light"] .btn-secondary {
+  border-color: rgba(129, 75, 238, 0.36);
+  color: #814BEE;
+  background: rgba(129, 75, 238, 0.05);
+}
+
+html[data-theme="light"] .btn-secondary:hover {
+  background: rgba(129, 75, 238, 0.12);
+  border-color: #814BEE;
+}
+
+/* ── Login Page ──────────────────────────────────────────────────────────── */
+html[data-theme="light"] .login-page {
+  background-image:
+    radial-gradient(circle at 50% 18%, rgba(129, 75, 238, 0.14), transparent 32%),
+    linear-gradient(180deg, #f0ebff 0%, #f8f5ff 100%);
+}
+
+html[data-theme="light"] .login-orbit {
+  border-color: rgba(129, 75, 238, 0.12);
+}
+
+html[data-theme="light"] .login-identity h1 {
+  background: linear-gradient(135deg, #1a1028, #814BEE);
+  -webkit-background-clip: text;
+  -webkit-text-fill-color: transparent;
+  background-clip: text;
+}
+
+html[data-theme="light"] .login-identity p {
+  color: #814BEE;
+}
+
+html[data-theme="light"] .login-home-button {
+  border-color: rgba(129, 75, 238, 0.32);
+  color: #814BEE;
+  background: linear-gradient(135deg, rgba(129, 75, 238, 0.1), rgba(255, 255, 255, 0.8)),
+    rgba(255, 255, 255, 0.9);
+  box-shadow: 0 14px 34px rgba(129, 75, 238, 0.12);
+}
+
+html[data-theme="light"] .login-home-button span {
+  color: #ffffff;
+  background: #814BEE;
+}
+
+html[data-theme="light"] .login-home-button:hover {
+  border-color: rgba(129, 75, 238, 0.6);
+  background: linear-gradient(135deg, rgba(129, 75, 238, 0.15), rgba(255, 255, 255, 0.9)),
+    rgba(255, 255, 255, 0.95);
+}
+
+html[data-theme="light"] .login-card {
+  background:
+    linear-gradient(135deg, rgba(255, 255, 255, 0.98), rgba(248, 245, 255, 0.9));
+  border-color: rgba(129, 75, 238, 0.15);
+  box-shadow:
+    0 24px 48px rgba(129, 75, 238, 0.1),
+    0 0 0 1px rgba(129, 75, 238, 0.07),
+    inset 0 1px 0 rgba(255, 255, 255, 0.9);
+}
+
+html[data-theme="light"] .field-row {
+  color: #4a3d6a;
+}
+
+html[data-theme="light"] .field-row span {
+  color: #9e8ebf;
+}
+
+html[data-theme="light"] .input-shell {
+  border-color: rgba(129, 75, 238, 0.15);
+  background: #faf8ff;
+}
+
+html[data-theme="light"] .input-shell:focus-within {
+  border-color: rgba(129, 75, 238, 0.5);
+  box-shadow: 0 0 0 3px rgba(129, 75, 238, 0.08);
+}
+
+html[data-theme="light"] .input-shell input {
+  color: #1a1028;
+}
+
+html[data-theme="light"] .login-links {
+  border-top-color: rgba(129, 75, 238, 0.1);
+  color: #7b6b9a;
+}
+
+html[data-theme="light"] .login-links a:hover {
+  color: #814BEE;
+}
+
+html[data-theme="light"] .login-status {
+  border-color: rgba(129, 75, 238, 0.14);
+  background: rgba(129, 75, 238, 0.05);
+}
+
+/* ── Page Progress Bar ───────────────────────────────────────────────────── */
+html[data-theme="light"] #page-progress {
+  background: linear-gradient(90deg, #814BEE, #a67ff5, #814BEE);
+}
+
+html[data-theme="light"] #page-overlay {
+  background: rgba(248, 245, 255, 0.8);
+}
+
+html[data-theme="light"] .page-spinner {
+  border-color: rgba(129, 75, 238, 0.2);
+  border-top-color: #814BEE;
+}
+
+html[data-theme="light"] .page-spinner-label {
+  color: rgba(129, 75, 238, 0.7);
+}
+
+/* ── Footer ──────────────────────────────────────────────────────────────── */
+html[data-theme="light"] .site-footer {
+  border-top-color: rgba(129, 75, 238, 0.1);
+  background: linear-gradient(180deg, #f0ebff 0%, #e8e0ff 100%);
+}
+
+html[data-theme="light"] .footer-section h4 {
+  color: #1a1028;
+}
+
+html[data-theme="light"] .footer-section a {
+  color: #6b5c8a;
+}
+
+html[data-theme="light"] .footer-section a:hover {
+  color: #814BEE;
+}
+
+html[data-theme="light"] .footer-logo strong {
+  color: #814BEE;
+}
+
+html[data-theme="light"] .footer-logo small {
+  color: #9e8ebf;
+}
+
+html[data-theme="light"] .footer-description {
+  color: #5a4b7a;
+}
+
+html[data-theme="light"] .social-links a {
+  border-color: rgba(129, 75, 238, 0.18);
+  color: #6b5c8a;
+  background: rgba(129, 75, 238, 0.04);
+}
+
+html[data-theme="light"] .social-links a:hover {
+  color: #814BEE;
+  border-color: #814BEE;
+  background: rgba(129, 75, 238, 0.1);
+}
+
+html[data-theme="light"] .footer-bottom {
+  color: #9e8ebf;
+}
+
+html[data-theme="light"] .footer-back-to-top {
+  color: #814BEE;
+}
+
+html[data-theme="light"] .footer-back-to-top:hover {
+  text-shadow: 0 0 16px rgba(129, 75, 238, 0.4);
+}
+
+html[data-theme="light"] .footer-grid {
+  border-bottom-color: rgba(129, 75, 238, 0.1);
+}
+
+/* ── Dashboard Sidebar ───────────────────────────────────────────────────── */
+html[data-theme="light"] .dashboard-container {
+  background: #f4f0ff;
+}
+
+html[data-theme="light"] .dashboard-sidebar {
+  background: linear-gradient(180deg, rgba(255, 255, 255, 0.99) 0%, rgba(248, 245, 255, 0.99) 100%);
+  border-right-color: rgba(129, 75, 238, 0.14);
+}
+
+html[data-theme="light"] .sidebar-header {
+  border-bottom-color: rgba(129, 75, 238, 0.12);
+}
+
+html[data-theme="light"] .sidebar-brand span {
+  color: #814BEE;
+}
+
+html[data-theme="light"] .sidebar-close {
+  border-color: rgba(129, 75, 238, 0.18);
+  color: #1a1028;
+}
+
+html[data-theme="light"] .sidebar-close:hover {
+  border-color: #814BEE;
+  color: #814BEE;
+  background: rgba(129, 75, 238, 0.06);
+}
+
+html[data-theme="light"] .nav-item {
+  color: #5a4b7a;
+}
+
+html[data-theme="light"] .nav-item::before {
+  background: linear-gradient(180deg, #814BEE, #6c3dca);
+}
+
+html[data-theme="light"] .nav-item:hover {
+  color: #814BEE;
+  background: rgba(129, 75, 238, 0.08);
+}
+
+html[data-theme="light"] .nav-item.is-active {
+  color: #814BEE;
+  background: rgba(129, 75, 238, 0.12);
+}
+
+html[data-theme="light"] .sidebar-footer {
+  border-top-color: rgba(129, 75, 238, 0.12);
+}
+
+html[data-theme="light"] .logout-btn {
+  color: var(--danger);
+}
+
+html[data-theme="light"] .logout-btn:hover {
+  background: rgba(230, 57, 70, 0.06);
+  border-color: var(--danger);
+}
+
+/* ── Dashboard Header ────────────────────────────────────────────────────── */
+html[data-theme="light"] .dashboard-header {
+  background: linear-gradient(135deg, rgba(255, 255, 255, 0.99) 0%, rgba(248, 245, 255, 0.99) 100%);
+  border-bottom: 1px solid rgba(129, 75, 238, 0.1);
+  box-shadow: 0 2px 16px rgba(129, 75, 238, 0.06);
+}
+
+html[data-theme="light"] .hamburger-menu {
+  border-color: rgba(129, 75, 238, 0.18);
+}
+
+html[data-theme="light"] .hamburger-menu:hover {
+  border-color: #814BEE;
+  background: rgba(129, 75, 238, 0.06);
+}
+
+html[data-theme="light"] .hamburger-menu span {
+  background: #814BEE;
+}
+
+html[data-theme="light"] .header-title h1 {
+  color: #814BEE;
+}
+
+html[data-theme="light"] .header-btn {
+  border-color: rgba(129, 75, 238, 0.16);
+  background: rgba(129, 75, 238, 0.04);
+  color: #1a1028;
+}
+
+html[data-theme="light"] .header-btn:hover {
+  border-color: #814BEE;
+  background: rgba(129, 75, 238, 0.08);
+  color: #814BEE;
+}
+
+html[data-theme="light"] .avatar {
+  background: linear-gradient(135deg, #814BEE, #6c3dca);
+  color: #ffffff;
+}
+
+/* ── Welcome Card & Stats ─────────────────────────────────────────────────── */
+html[data-theme="light"] .welcome-card {
+  border-color: rgba(129, 75, 238, 0.14);
+  background: linear-gradient(135deg, rgba(129, 75, 238, 0.06), rgba(108, 61, 202, 0.03));
+}
+
+html[data-theme="light"] .welcome-card::before {
+  background: radial-gradient(circle, rgba(129, 75, 238, 0.12), transparent);
+}
+
+html[data-theme="light"] .welcome-card h2 {
+  color: #814BEE;
+}
+
+html[data-theme="light"] .welcome-icon {
+  color: rgba(129, 75, 238, 0.2);
+}
+
+html[data-theme="light"] .stat-card {
+  border-color: rgba(129, 75, 238, 0.12);
+  background: linear-gradient(135deg, rgba(255, 255, 255, 0.8), rgba(248, 245, 255, 0.5));
+}
+
+html[data-theme="light"] .stat-card:hover {
+  border-color: rgba(129, 75, 238, 0.3);
+  background: linear-gradient(135deg, rgba(255, 255, 255, 0.95), rgba(248, 245, 255, 0.8));
+}
+
+html[data-theme="light"] .stat-card::before {
+  background: linear-gradient(90deg, transparent, rgba(129, 75, 238, 0.04), transparent);
+}
+
+html[data-theme="light"] .stat-icon.users {
+  background: rgba(129, 75, 238, 0.12);
+  color: #814BEE;
+}
+
+html[data-theme="light"] .activity-section {
+  border-color: rgba(129, 75, 238, 0.12);
+  background: linear-gradient(135deg, rgba(255, 255, 255, 0.8), rgba(248, 245, 255, 0.5));
+}
+
+html[data-theme="light"] .activity-section h2 {
+  color: #814BEE;
+}
+
+html[data-theme="light"] .activity-item {
+  border-color: rgba(129, 75, 238, 0.1);
+  background: rgba(255, 255, 255, 0.6);
+}
+
+html[data-theme="light"] .activity-item:hover {
+  border-color: rgba(129, 75, 238, 0.25);
+  background: rgba(255, 255, 255, 0.9);
+}
+
+html[data-theme="light"] .activity-icon.info {
+  background: rgba(129, 75, 238, 0.1);
+  color: #814BEE;
+}
+
+/* ── Tables ──────────────────────────────────────────────────────────────── */
+html[data-theme="light"] .users-table {
+  background: rgba(255, 255, 255, 0.9);
+  border-color: rgba(129, 75, 238, 0.12);
+}
+
+html[data-theme="light"] .users-table thead {
+  background: rgba(248, 245, 255, 0.9);
+  border-bottom-color: rgba(129, 75, 238, 0.18);
+}
+
+html[data-theme="light"] .users-table tbody tr {
+  border-bottom-color: rgba(129, 75, 238, 0.07);
+}
+
+html[data-theme="light"] .users-table tbody tr:hover {
+  background: rgba(129, 75, 238, 0.04);
+}
+
+html[data-theme="light"] .user-row:hover {
+  background: rgba(129, 75, 238, 0.05) !important;
+}
+
+html[data-theme="light"] .badge-operator {
+  background: rgba(129, 75, 238, 0.12);
+  color: #814BEE;
+}
+
+html[data-theme="light"] .action-btn {
+  border-color: rgba(129, 75, 238, 0.16);
+  color: #6b5c8a;
+}
+
+html[data-theme="light"] .action-btn:hover {
+  border-color: #814BEE;
+  color: #814BEE;
+  background: rgba(129, 75, 238, 0.06);
+}
+
+html[data-theme="light"] .add-user-btn,
+html[data-theme="light"] .add-access-btn {
+  background: #814BEE;
+  color: #ffffff;
+}
+
+html[data-theme="light"] .add-user-btn:hover,
+html[data-theme="light"] .add-access-btn:hover {
+  box-shadow: 0 8px 20px rgba(129, 75, 238, 0.32);
+}
+
+/* ── Search Box ──────────────────────────────────────────────────────────── */
+html[data-theme="light"] .search-box {
+  background: rgba(255, 255, 255, 0.9);
+  border-color: rgba(129, 75, 238, 0.16);
+}
+
+html[data-theme="light"] .search-box input {
+  color: #1a1028;
+}
+
+/* ── Access Control Cards ────────────────────────────────────────────────── */
+html[data-theme="light"] .access-card {
+  background: rgba(255, 255, 255, 0.9);
+  border-color: rgba(129, 75, 238, 0.12);
+}
+
+html[data-theme="light"] .access-card:hover {
+  border-color: #814BEE;
+  box-shadow: 0 12px 32px rgba(129, 75, 238, 0.1);
+}
+
+html[data-theme="light"] .access-header {
+  border-bottom-color: rgba(129, 75, 238, 0.1);
+}
+
+html[data-theme="light"] .access-info {
+  background: rgba(129, 75, 238, 0.03);
+}
+
+/* ── Modals ──────────────────────────────────────────────────────────────── */
+html[data-theme="light"] .modal-content.glass-card {
+  background: rgba(255, 255, 255, 0.98);
+  border: 1px solid rgba(129, 75, 238, 0.14);
+  box-shadow: 0 32px 80px rgba(129, 75, 238, 0.18);
+}
+
+html[data-theme="light"] .modal-header {
+  border-bottom-color: rgba(129, 75, 238, 0.1);
+}
+
+html[data-theme="light"] .modal-footer {
+  border-top-color: rgba(129, 75, 238, 0.1);
+  background: rgba(248, 245, 255, 0.6);
+}
+
+html[data-theme="light"] .modal-close {
+  color: #6b5c8a;
+  border-color: rgba(129, 75, 238, 0.16);
+}
+
+html[data-theme="light"] .modal-close:hover {
+  color: #814BEE;
+  border-color: #814BEE;
+  background: rgba(129, 75, 238, 0.06);
+}
+
+html[data-theme="light"] .modal-badge-root {
+  background: rgba(129, 75, 238, 0.1);
+  color: #814BEE;
+  border-color: rgba(129, 75, 238, 0.2);
+}
+
+html[data-theme="light"] .admin-profile-banner {
+  background: linear-gradient(135deg, rgba(129, 75, 238, 0.08), rgba(248, 245, 255, 0.9));
+  border-color: rgba(129, 75, 238, 0.12);
+}
+
+html[data-theme="light"] .admin-modal-avatar {
+  background: linear-gradient(135deg, #814BEE, #6c3dca);
+  color: #ffffff;
+}
+
+html[data-theme="light"] .info-card {
+  background: rgba(255, 255, 255, 0.8);
+  border-color: rgba(129, 75, 238, 0.12);
+}
+
+html[data-theme="light"] .info-card-header {
+  border-bottom-color: rgba(129, 75, 238, 0.1);
+  color: #814BEE;
+}
+
+html[data-theme="light"] .badge-accent {
+  background: rgba(129, 75, 238, 0.1);
+  color: #814BEE;
+}
+
+html[data-theme="light"] .tag {
+  background: rgba(129, 75, 238, 0.08);
+  color: #6c3dca;
+  border-color: rgba(129, 75, 238, 0.18);
+}
+
+/* ── Dropdown Panels ─────────────────────────────────────────────────────── */
+html[data-theme="light"] .dropdown-panel {
+  background: rgba(255, 255, 255, 0.98);
+  border-color: rgba(129, 75, 238, 0.14);
+  box-shadow: 0 16px 48px rgba(129, 75, 238, 0.14);
+}
+
+html[data-theme="light"] .dropdown-panel-header {
+  border-bottom-color: rgba(129, 75, 238, 0.1);
+}
+
+html[data-theme="light"] .dropdown-panel-footer {
+  border-top-color: rgba(129, 75, 238, 0.1);
+  background: rgba(248, 245, 255, 0.5);
+}
+
+html[data-theme="light"] .dropdown-item {
+  border-radius: 8px;
+}
+
+html[data-theme="light"] .dropdown-item:hover {
+  background: rgba(129, 75, 238, 0.06);
+}
+
+html[data-theme="light"] .dropdown-footer-action {
+  border-top-color: rgba(129, 75, 238, 0.1);
+}
+
+html[data-theme="light"] .dropdown-logout-btn {
+  color: var(--danger);
+  border-color: rgba(230, 57, 70, 0.2);
+}
+
+html[data-theme="light"] .dropdown-logout-btn:hover {
+  background: rgba(230, 57, 70, 0.06);
+}
+
+html[data-theme="light"] .menu-icon.icon-cyan {
+  background: rgba(129, 75, 238, 0.1);
+  color: #814BEE;
+}
+
+html[data-theme="light"] .menu-icon.icon-purple {
+  background: rgba(129, 75, 238, 0.1);
+  color: #814BEE;
+}
+
+html[data-theme="light"] .menu-icon.icon-blue {
+  background: rgba(91, 53, 213, 0.1);
+  color: #5b35d5;
+}
+
+html[data-theme="light"] .profile-card-header {
+  background: linear-gradient(135deg, rgba(129, 75, 238, 0.06), rgba(255, 255, 255, 0.9));
+  border-bottom-color: rgba(129, 75, 238, 0.1);
+}
+
+html[data-theme="light"] .avatar-lg {
+  background: linear-gradient(135deg, #814BEE, #6c3dca);
+  color: #ffffff;
+}
+
+html[data-theme="light"] .profile-role-badge {
+  background: rgba(129, 75, 238, 0.1);
+  color: #814BEE;
+  border-color: rgba(129, 75, 238, 0.2);
+}
+
+html[data-theme="light"] .notification-tabs {
+  border-bottom-color: rgba(129, 75, 238, 0.1);
+}
+
+html[data-theme="light"] .notif-tab {
+  color: #6b5c8a;
+}
+
+html[data-theme="light"] .notif-tab.is-active {
+  color: #814BEE;
+  border-bottom-color: #814BEE;
+}
+
+html[data-theme="light"] .notif-item {
+  border-bottom-color: rgba(129, 75, 238, 0.08);
+}
+
+html[data-theme="light"] .notif-item:hover {
+  background: rgba(129, 75, 238, 0.04);
+}
+
+html[data-theme="light"] .notif-icon-badge {
+  background: rgba(129, 75, 238, 0.1);
+  color: #814BEE;
+}
+
+html[data-theme="light"] .view-all-logs-link {
+  color: #814BEE;
+}
+
+html[data-theme="light"] .view-all-logs-link:hover {
+  background: rgba(129, 75, 238, 0.06);
+}
+
+html[data-theme="light"] .online-status-dot {
+  background: #2dc653;
+  border-color: #ffffff;
+}
+
+html[data-theme="light"] .unread-pill {
+  background: rgba(129, 75, 238, 0.12);
+  color: #814BEE;
+}
+
+/* ── Chips & Status Badges ───────────────────────────────────────────────── */
+html[data-theme="light"] .chip-cyan {
+  background: rgba(129, 75, 238, 0.1);
+  color: #6c3dca;
+  border-color: rgba(129, 75, 238, 0.2);
+}
+
+html[data-theme="light"] .chip-purple {
+  background: rgba(129, 75, 238, 0.1);
+  color: #6c3dca;
+  border-color: rgba(129, 75, 238, 0.2);
+}
+
+/* ── Sidebar Overlay ─────────────────────────────────────────────────────── */
+html[data-theme="light"] .sidebar-overlay {
+  background: rgba(129, 75, 238, 0.18);
+}
+
+/* ── Pulse Dot ───────────────────────────────────────────────────────────── */
+html[data-theme="light"] .pulse-dot {
+  background: var(--ok);
+  box-shadow: 0 0 16px rgba(45, 198, 83, 0.6);
+}
+
+/* ── Authentication / Bluetooth / Settings page specifics ────────────────── */
+html[data-theme="light"] .glass-card {
+  background: rgba(255, 255, 255, 0.92);
+  border-color: rgba(129, 75, 238, 0.12);
+  box-shadow: 0 12px 40px rgba(129, 75, 238, 0.08);
+}
+
+html[data-theme="light"] .text-cyan {
+  color: #814BEE !important;
+}
+
+html[data-theme="light"] .user-details-main-img {
+  border-color: #814BEE;
+  box-shadow: 0 4px 16px rgba(129, 75, 238, 0.25);
+}
+
+html[data-theme="light"] .details-sample-card {
+  border-color: rgba(129, 75, 238, 0.25);
+}
+
+html[data-theme="light"] .details-sample-card:hover {
+  border-color: #814BEE;
+  box-shadow: 0 6px 16px rgba(129, 75, 238, 0.22);
+}
+
+/* ── Logs Page ───────────────────────────────────────────────────────────── */
+html[data-theme="light"] .logs-section,
+html[data-theme="light"] .log-entry {
+  background: rgba(255, 255, 255, 0.9);
+  border-color: rgba(129, 75, 238, 0.1);
+}
+
+/* ── Settings Page ───────────────────────────────────────────────────────── */
+html[data-theme="light"] .settings-card,
+html[data-theme="light"] .settings-section {
+  background: rgba(255, 255, 255, 0.9);
+  border-color: rgba(129, 75, 238, 0.12);
+}
+
+/* ── Form inputs (general) ───────────────────────────────────────────────── */
+html[data-theme="light"] input,
+html[data-theme="light"] select,
+html[data-theme="light"] textarea {
+  background: #faf8ff;
+  color: #1a1028;
+  border-color: rgba(129, 75, 238, 0.2);
+}
+
+html[data-theme="light"] input:focus,
+html[data-theme="light"] select:focus,
+html[data-theme="light"] textarea:focus {
+  border-color: #814BEE;
+  box-shadow: 0 0 0 3px rgba(129, 75, 238, 0.08);
+  outline: none;
+}
+
+html[data-theme="light"] input::placeholder,
+html[data-theme="light"] textarea::placeholder {
+  color: #9e8ebf;
+}
+
+/* ── Scrollbar ───────────────────────────────────────────────────────────── */
+html[data-theme="light"] ::-webkit-scrollbar-track {
+  background: #f0ebff;
+}
+
+html[data-theme="light"] ::-webkit-scrollbar-thumb {
+  background: rgba(129, 75, 238, 0.3);
+  border-color: #f0ebff;
+}
+
+html[data-theme="light"] ::-webkit-scrollbar-thumb:hover {
+  background: rgba(129, 75, 238, 0.5);
+}
+
+/* ═══════════════════════════════════════════════════════════════════════════
+   FACE AUTH + BLUETOOTH 2FA PAGE — Light Mode Overrides
+   All hardcoded dark backgrounds in pages/auth.css are corrected here
+   ═══════════════════════════════════════════════════════════════════════════ */
+
+/* ── Camera Panel ─────────────────────────────────────────────────────────── */
+html[data-theme="light"] .camera-panel {
+  background: #f0ebff;
+  border-color: rgba(129, 75, 238, 0.18);
+}
+
+html[data-theme="light"] .camera-status-bar {
+  background: rgba(129, 75, 238, 0.04);
+  border-bottom-color: rgba(129, 75, 238, 0.12);
+}
+
+html[data-theme="light"] .camera-feed-wrap {
+  background: #e8e0ff;
+}
+
+html[data-theme="light"] .camera-placeholder {
+  color: #6b5c8a;
+}
+
+html[data-theme="light"] .cam-placeholder-icon {
+  background: rgba(129, 75, 238, 0.08);
+  border-color: rgba(129, 75, 238, 0.2);
+  color: #814BEE;
+}
+
+html[data-theme="light"] .cam-placeholder-title {
+  color: #3a2460;
+}
+
+html[data-theme="light"] .cam-placeholder-sub {
+  color: #6b5c8a;
+}
+
+html[data-theme="light"] .cam-icon-btn {
+  border-color: rgba(129, 75, 238, 0.2);
+  color: #6b5c8a;
+}
+
+html[data-theme="light"] .cam-icon-btn:hover:not(:disabled) {
+  border-color: #814BEE;
+  color: #814BEE;
+  background: rgba(129, 75, 238, 0.08);
+}
+
+html[data-theme="light"] .snapshot-strip {
+  background: rgba(129, 75, 238, 0.03);
+  border-top-color: rgba(129, 75, 238, 0.1);
+}
+
+html[data-theme="light"] .snap-dl {
+  background: rgba(255, 255, 255, 0.8);
+  color: #814BEE;
+}
+
+html[data-theme="light"] .corner-bracket {
+  border-color: rgba(129, 75, 238, 0.45);
+}
+
+html[data-theme="light"] .scan-line {
+  background: linear-gradient(90deg, transparent, rgba(129, 75, 238, 0.6), transparent);
+  box-shadow: 0 0 12px rgba(129, 75, 238, 0.4);
+}
+
+/* ── Auth Controls — Right-side Step Cards ────────────────────────────────── */
+html[data-theme="light"] .auth-card {
+  background: rgba(255, 255, 255, 0.92);
+  border-color: rgba(129, 75, 238, 0.14);
+  box-shadow: 0 4px 16px rgba(129, 75, 238, 0.07);
+}
+
+html[data-theme="light"] .auth-card-title {
+  color: #814BEE;
+}
+
+html[data-theme="light"] .auth-toggle-row {
+  color: #5a4b7a;
+}
+
+html[data-theme="light"] .toggle-track {
+  background: rgba(129, 75, 238, 0.08);
+  border-color: rgba(129, 75, 238, 0.2);
+}
+
+html[data-theme="light"] .toggle-switch-wrap input:checked + .toggle-track {
+  background: rgba(129, 75, 238, 0.2);
+  border-color: rgba(129, 75, 238, 0.45);
+}
+
+html[data-theme="light"] .toggle-switch-wrap input:checked + .toggle-track::after {
+  background: #814BEE;
+}
+
+html[data-theme="light"] .clear-log-btn {
+  border-color: rgba(129, 75, 238, 0.2);
+  color: #6b5c8a;
+}
+
+html[data-theme="light"] .log-row {
+  border-bottom-color: rgba(129, 75, 238, 0.08);
+}
+
+html[data-theme="light"] .log-info .log-msg {
+  color: #814BEE;
+}
+
+html[data-theme="light"] .auth-log-feed::-webkit-scrollbar-thumb {
+  background: rgba(129, 75, 238, 0.25);
+}
+
+/* ── Stepper / Progress Bar at top of Face Auth ───────────────────────────── */
+html[data-theme="light"] .step-bar,
+html[data-theme="light"] .auth-stepper,
+html[data-theme="light"] .step-progress {
+  background: rgba(255, 255, 255, 0.9);
+  border-color: rgba(129, 75, 238, 0.14);
+}
+
+html[data-theme="light"] .step-item.active,
+html[data-theme="light"] .step-item.is-active {
+  background: rgba(129, 75, 238, 0.12);
+  border-color: rgba(129, 75, 238, 0.3);
+  color: #814BEE;
+}
+
+html[data-theme="light"] .step-item .step-num,
+html[data-theme="light"] .step-number {
+  background: rgba(129, 75, 238, 0.15);
+  color: #814BEE;
+  border-color: rgba(129, 75, 238, 0.3);
+}
+
+html[data-theme="light"] .step-connector,
+html[data-theme="light"] .step-divider {
+  background: rgba(129, 75, 238, 0.2);
+}
+
+/* ── Bluetooth 2FA — Scanner Card ─────────────────────────────────────────── */
+html[data-theme="light"] .bt-scanner-card,
+html[data-theme="light"] .scanner-card,
+html[data-theme="light"] .bluetooth-card {
+  background: rgba(255, 255, 255, 0.92);
+  border-color: rgba(129, 75, 238, 0.14);
+  box-shadow: 0 8px 32px rgba(129, 75, 238, 0.09);
+}
+
+html[data-theme="light"] .bt-visual,
+html[data-theme="light"] .scanner-visual {
+  background: rgba(129, 75, 238, 0.06);
+  border-color: rgba(129, 75, 238, 0.15);
+}
+
+html[data-theme="light"] .bt-icon-wrap,
+html[data-theme="light"] .scanner-icon {
+  background: rgba(129, 75, 238, 0.12);
+  color: #814BEE;
+  border-color: rgba(129, 75, 238, 0.3);
+}
+
+html[data-theme="light"] .bt-ring,
+html[data-theme="light"] .scan-ring {
+  border-color: rgba(129, 75, 238, 0.25);
+}
+
+html[data-theme="light"] .bt-status-label,
+html[data-theme="light"] .scanner-status {
+  color: #5a4b7a;
+}
+
+html[data-theme="light"] .bt-stats,
+html[data-theme="light"] .scanner-stats {
+  border-top-color: rgba(129, 75, 238, 0.1);
+}
+
+html[data-theme="light"] .bt-stat-value,
+html[data-theme="light"] .stat-num {
+  color: #3a2460;
+}
+
+html[data-theme="light"] .bt-stat-label,
+html[data-theme="light"] .stat-lbl {
+  color: #6b5c8a;
+}
+
+html[data-theme="light"] .bt-threshold-row,
+html[data-theme="light"] .threshold-row {
+  background: rgba(129, 75, 238, 0.05);
+  border-color: rgba(129, 75, 238, 0.12);
+  border-radius: 6px;
+}
+
+html[data-theme="light"] .scan-all-btn,
+html[data-theme="light"] .bt-scan-btn {
+  background: linear-gradient(135deg, #814BEE, #6c3dca);
+  color: #ffffff;
+  box-shadow: 0 8px 24px rgba(129, 75, 238, 0.3);
+}
+
+html[data-theme="light"] .scan-all-btn:hover,
+html[data-theme="light"] .bt-scan-btn:hover {
+  box-shadow: 0 12px 32px rgba(129, 75, 238, 0.4);
+}
+
+/* ── Proximity Check Panel ────────────────────────────────────────────────── */
+html[data-theme="light"] .proximity-panel,
+html[data-theme="light"] .proximity-card {
+  background: rgba(255, 255, 255, 0.92);
+  border-color: rgba(129, 75, 238, 0.14);
+  box-shadow: 0 4px 16px rgba(129, 75, 238, 0.07);
+}
+
+html[data-theme="light"] .proximity-check-btn {
+  background: linear-gradient(135deg, #814BEE, #6c3dca);
+  color: #ffffff;
+  border: none;
+}
+
+html[data-theme="light"] .proximity-check-btn:hover {
+  box-shadow: 0 8px 24px rgba(129, 75, 238, 0.3);
+}
+
+/* ── Registered Users Table (Bluetooth page) ──────────────────────────────── */
+html[data-theme="light"] .registered-panel,
+html[data-theme="light"] .registered-users-panel {
+  background: rgba(255, 255, 255, 0.92);
+  border-color: rgba(129, 75, 238, 0.14);
+  box-shadow: 0 4px 16px rgba(129, 75, 238, 0.07);
+}
+
+html[data-theme="light"] .registered-table thead,
+html[data-theme="light"] .bt-users-table thead {
+  background: rgba(248, 245, 255, 0.9);
+  border-bottom-color: rgba(129, 75, 238, 0.18);
+}
+
+html[data-theme="light"] .registered-table th,
+html[data-theme="light"] .bt-users-table th {
+  color: rgba(129, 75, 238, 0.7);
+}
+
+html[data-theme="light"] .registered-table tbody tr,
+html[data-theme="light"] .bt-users-table tbody tr {
+  border-bottom-color: rgba(129, 75, 238, 0.07);
+}
+
+html[data-theme="light"] .registered-table tbody tr:hover,
+html[data-theme="light"] .bt-users-table tbody tr:hover {
+  background: rgba(129, 75, 238, 0.04);
+}
+
+html[data-theme="light"] .set-mac-btn,
+html[data-theme="light"] .mac-btn {
+  border-color: rgba(129, 75, 238, 0.2);
+  color: #814BEE;
+  background: rgba(129, 75, 238, 0.05);
+}
+
+html[data-theme="light"] .set-mac-btn:hover,
+html[data-theme="light"] .mac-btn:hover {
+  background: rgba(129, 75, 238, 0.12);
+  border-color: #814BEE;
+}
+
+/* ── Dropdown Panels (Notification + Profile) ─────────────────────────────── */
+html[data-theme="light"] .dropdown-panel {
+  background: rgba(255, 255, 255, 0.98);
+  border-color: rgba(129, 75, 238, 0.2);
+  box-shadow: 0 25px 70px rgba(129, 75, 238, 0.18), 0 0 35px rgba(129, 75, 238, 0.08);
+}
+
+html[data-theme="light"] .dropdown-panel-header {
+  background: rgba(248, 245, 255, 0.8);
+  border-bottom-color: rgba(129, 75, 238, 0.1);
+}
+
+html[data-theme="light"] .notification-tabs {
+  background: rgba(248, 245, 255, 0.9);
+  border-bottom-color: rgba(129, 75, 238, 0.1);
+}
+
+html[data-theme="light"] .notif-tab:hover {
+  background: rgba(129, 75, 238, 0.06);
+  color: #3a2460;
+}
+
+html[data-theme="light"] .notif-tab.is-active {
+  background: rgba(129, 75, 238, 0.1);
+  border-color: rgba(129, 75, 238, 0.3);
+  color: #814BEE;
+}
+
+html[data-theme="light"] .notif-item {
+  background: rgba(248, 245, 255, 0.6);
+  border-color: rgba(129, 75, 238, 0.08);
+}
+
+html[data-theme="light"] .notif-item:hover {
+  background: rgba(129, 75, 238, 0.06);
+  border-color: rgba(129, 75, 238, 0.18);
+}
+
+html[data-theme="light"] .notif-item.unread {
+  background: rgba(129, 75, 238, 0.07);
+  border-color: rgba(129, 75, 238, 0.22);
+}
+
+html[data-theme="light"] .dropdown-panel-footer {
+  background: rgba(240, 235, 255, 0.7);
+  border-top-color: rgba(129, 75, 238, 0.1);
+}
+
+html[data-theme="light"] .dropdown-footer-action {
+  background: rgba(240, 235, 255, 0.7);
+  border-top-color: rgba(129, 75, 238, 0.1);
+}
+
+html[data-theme="light"] .dropdown-item:hover {
+  background: rgba(129, 75, 238, 0.05);
+  border-color: rgba(129, 75, 238, 0.12);
+}
+
+html[data-theme="light"] .menu-icon {
+  background: rgba(129, 75, 238, 0.07);
+  border-color: rgba(129, 75, 238, 0.12);
+  color: #814BEE;
+}
+
+html[data-theme="light"] .menu-text strong {
+  color: #1a1028;
+}
+
+html[data-theme="light"] .menu-text small {
+  color: #6b5c8a;
+}
+
+html[data-theme="light"] .dropdown-logout-btn {
+  background: rgba(230, 57, 70, 0.07);
+  border-color: rgba(230, 57, 70, 0.2);
+  color: #e63946;
+}
+
+html[data-theme="light"] .dropdown-logout-btn:hover {
+  background: rgba(230, 57, 70, 0.14);
+  border-color: rgba(230, 57, 70, 0.4);
+  color: #c0303c;
+  box-shadow: 0 4px 16px rgba(230, 57, 70, 0.15);
+}
+
+/* ── Profile Card Header ──────────────────────────────────────────────────── */
+html[data-theme="light"] .profile-card-header {
+  background: linear-gradient(135deg, rgba(129, 75, 238, 0.07), rgba(248, 245, 255, 0.9));
+  border-bottom-color: rgba(129, 75, 238, 0.1);
+}
+
+html[data-theme="light"] .profile-name {
+  color: #1a1028;
+}
+
+html[data-theme="light"] .profile-role-badge {
+  background: rgba(129, 75, 238, 0.1);
+  border-color: rgba(129, 75, 238, 0.25);
+  color: #814BEE;
+}
+
+html[data-theme="light"] .status-indicator.online,
+html[data-theme="light"] .online-status-dot {
+  border-color: #ffffff;
+}
+
+/* ── Admin Profile Modal ──────────────────────────────────────────────────── */
+html[data-theme="light"] .admin-profile-modal .modal-content {
+  background: rgba(255, 255, 255, 0.99);
+  border-color: rgba(129, 75, 238, 0.15);
+  box-shadow: 0 25px 70px rgba(129, 75, 238, 0.2), 0 0 40px rgba(129, 75, 238, 0.08);
+}
+
+html[data-theme="light"] .admin-profile-modal .modal-header {
+  background: rgba(248, 245, 255, 0.6);
+  border-bottom-color: rgba(129, 75, 238, 0.1);
+}
+
+html[data-theme="light"] .modal-title-with-badge h3 {
+  color: #1a1028;
+}
+
+html[data-theme="light"] .modal-badge-root {
+  background: linear-gradient(135deg, rgba(129, 75, 238, 0.12), rgba(168, 85, 247, 0.12));
+  border-color: rgba(129, 75, 238, 0.3);
+  color: #814BEE;
+}
+
+html[data-theme="light"] .admin-profile-banner {
+  background: linear-gradient(135deg, rgba(129, 75, 238, 0.08), rgba(248, 245, 255, 0.9));
+  border-color: rgba(129, 75, 238, 0.18);
+}
+
+html[data-theme="light"] .admin-modal-avatar {
+  background: linear-gradient(135deg, #814BEE, #6c3dca);
+  color: #ffffff;
+}
+
+html[data-theme="light"] .admin-modal-details h2 {
+  color: #1a1028;
+}
+
+html[data-theme="light"] .pulse-indicator {
+  border-color: #ffffff;
+}
+
+html[data-theme="light"] .info-card {
+  background: rgba(248, 245, 255, 0.7);
+  border-color: rgba(129, 75, 238, 0.12);
+}
+
+html[data-theme="light"] .info-card-header {
+  color: #814BEE;
+  border-bottom-color: rgba(129, 75, 238, 0.1);
+}
+
+html[data-theme="light"] .info-row strong,
+html[data-theme="light"] .info-row span {
+  color: #1a1028;
+}
+
+html[data-theme="light"] .tag {
+  background: rgba(129, 75, 238, 0.07);
+  border-color: rgba(129, 75, 238, 0.15);
+  color: #5a4b7a;
+}
+
+html[data-theme="light"] .admin-profile-modal .modal-footer {
+  background: rgba(240, 235, 255, 0.6);
+  border-top-color: rgba(129, 75, 238, 0.1);
+}
+
+/* ── Auth Result Box ──────────────────────────────────────────────────────── */
+html[data-theme="light"] .result-granted {
+  background: rgba(45, 198, 83, 0.08);
+  border-color: rgba(45, 198, 83, 0.28);
+}
+
+html[data-theme="light"] .result-denied {
+  background: rgba(230, 57, 70, 0.08);
+  border-color: rgba(230, 57, 70, 0.28);
+}
+
+html[data-theme="light"] .result-error {
+  background: rgba(251, 191, 36, 0.08);
+  border-color: rgba(251, 191, 36, 0.28);
+}
